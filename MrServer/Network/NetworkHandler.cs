@@ -70,10 +70,7 @@ namespace MrServer.Network
             //receiveThreadUDP.Start();
         }
 
-        public void Stop()
-        {
-            running = false;
-        }
+        public void Stop() => running = false;
 
         private void _Start()
         {
@@ -219,6 +216,7 @@ namespace MrServer.Network
             return Task.CompletedTask;
         }
 
+        [Obsolete]
         private void OnSent<T>(IAsyncResult result)
         {
 

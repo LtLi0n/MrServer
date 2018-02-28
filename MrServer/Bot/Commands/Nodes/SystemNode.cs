@@ -12,13 +12,13 @@ using MrServer.Bot.Commands.Attributes.Permissions;
 namespace MrServer.Bot.Commands.Nodes
 {
     [CommandNode("System")]
+    [RequireRole(417325871838265356)]
     public class SystemNode : ICommandNode
     {
         [Command("Echo")]
         public async Task Echo([Remainder]string text) => await Context.Channel.SendMessageAsync(text);
 
         [Command("Ping")]
-        [RequireOwner]
         public async Task Ping() => await Context.Channel.SendMessageAsync("Pong!\nOk, have a cat picture too https://d1wn0q81ehzw6k.cloudfront.net/additional/thul/media/0eaa14d11e8930f5?w=400&h=400");
 
         [Command("Help")]

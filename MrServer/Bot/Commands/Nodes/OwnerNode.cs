@@ -11,12 +11,12 @@ using System.Threading.Tasks;
 namespace MrServer.Bot.Commands.Nodes
 {
     [CommandNode("Owner")]
+    [RequireOwner]
     class OwnerNode : ICommandNode
     {
         private OsuSQL OsuDB => Program.Entry.DataBases.OsuDB;
 
         [Command("SQL")]
-        [RequireOwner]
         public async Task SQL([Remainder]string command)
         {
             await OsuDB.ExecuteAsync(command);

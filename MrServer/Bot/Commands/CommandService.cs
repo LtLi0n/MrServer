@@ -79,6 +79,8 @@ namespace MrServer.Bot.Commands
             {
                 IEnumerable<MethodInfo> methods = node.GetMethods().Where(x => x.GetCustomAttribute<Command>() != null);
 
+                PermissionAttribute[] nodePermissions = node.GetCustomAttributes<PermissionAttribute>().ToArray();
+
                 Tool.ForEach(methods, async (m) =>
                 {
                     Command command = m.GetCustomAttribute(typeof(Command)) as Command;
@@ -111,15 +113,14 @@ namespace MrServer.Bot.Commands
 
                             cb.AddParameter(parameters[i].Name, type);
                         }
+
+                        Tool.ForEach(nodePermissions, p => cb.AddPermission(p));
                     }
                     //Attributes [Permissions]
                     {
                         IEnumerable<PermissionAttribute> attributes = m.GetCustomAttributes<PermissionAttribute>();
 
-                        Tool.ForEach(attributes, x =>
-                        {
-                            cb.AddPermission(x);
-                        });
+                        Tool.ForEach(attributes, x => cb.AddPermission(x));
                     }
 
                     await cb.OnCommand(m);

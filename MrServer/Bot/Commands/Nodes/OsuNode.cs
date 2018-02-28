@@ -20,12 +20,12 @@ using MrServer.Bot.Commands.Attributes.Permissions;
 namespace MrServer.Bot.Commands.Nodes
 {
     [CommandNode("Osu")]
+    [RequireRole(417325871838265356)]
     class OsuNode : ICommandNode
     {
         private OsuSQL OsuDB => Program.Entry.DataBases.OsuDB;
 
         [Command("Osu")]
-        [RequireRole(417325871838265356)]
         public async Task Osu([Remainder]string userName = null)
         {
             if (Context.Message.Mentions.Length > 1)
@@ -126,7 +126,6 @@ namespace MrServer.Bot.Commands.Nodes
         }
 
         [Command("OsuUnTrack")]
-        [RequireRole(417325871838265356)]
         public async Task Osu_UnTrack(string gameModeStr)
         {
             OsuBoundUserDB boundUser = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID);
@@ -153,7 +152,6 @@ namespace MrServer.Bot.Commands.Nodes
         }
 
         [Command("OsuTrack")]
-        [RequireRole(417325871838265356)]
         public async Task OsuTrack(string gameModeStr)
         {
             OsuBoundUserDB boundUser = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID);
@@ -184,7 +182,6 @@ namespace MrServer.Bot.Commands.Nodes
         }
 
         [Command("OsuBind")]
-        [RequireRole(417325871838265356)]
         public async Task OsuBindUser([Remainder]string userName)
         {
             OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userName);
@@ -204,7 +201,6 @@ namespace MrServer.Bot.Commands.Nodes
         }
 
         [Command("OsuUnBind")]
-        [RequireRole(417325871838265356)]
         public async Task OsuUnbindUser([Remainder]string userName)
         {
             OsuBoundUserDB boundUser = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID);
