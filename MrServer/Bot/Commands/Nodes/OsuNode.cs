@@ -15,7 +15,6 @@ using MrServer.Bot.Client;
 using System.Threading;
 using MrServer.Bot.Commands.Attributes;
 using System.Reflection;
-using MrServer.Bot.Commands.Extensions;
 using MrServer.Bot.Commands.Attributes.Permissions;
 
 namespace MrServer.Bot.Commands.Nodes

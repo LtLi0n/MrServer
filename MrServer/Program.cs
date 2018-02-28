@@ -22,8 +22,6 @@ namespace MrServer
 
         public static Program Entry;
 
-        public ulong ME = 174230278611533824;
-
         static void Main(string[] args) => (Entry = new Program()).Start().GetAwaiter().GetResult();
 
         public async Task Start()
