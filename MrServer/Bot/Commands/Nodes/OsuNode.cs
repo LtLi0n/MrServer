@@ -51,9 +51,9 @@ namespace MrServer.Bot.Commands.Nodes
             double progressDebug = osuUser.OsuLevel.Progress;
 
             eb.Description =
-            $"*• PP:* ***{Math.Round(osuUser.PP, 2, MidpointRounding.AwayFromZero)}***\n" +
-            $"*• Accuracy:* ***{string.Format("{0:0.##}", osuUser.Accuracy)}%***\n" +
-            $"*• Level:* ***{osuUser.OsuLevel.Level}***  ~~-~~ `{osuUser.OsuLevel.Progress.ToString("#0.000%")}`";
+            $"*• PP:* __***{Math.Round(osuUser.PP, 2, MidpointRounding.AwayFromZero)}***__\n" +
+            $"*• Accuracy:* __***{string.Format("{0:0.##}", osuUser.Accuracy)}%***__\n" +
+            $"*• Level:* __***{osuUser.OsuLevel.Level}***__  ~~-~~ *{osuUser.OsuLevel.Progress.ToString("#0.000%")}*";
 
             if (boundUser != null)
             {

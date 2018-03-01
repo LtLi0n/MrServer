@@ -51,12 +51,12 @@ namespace MrServer.Bot.Commands
             return this;
         }
 
-        public async Task OnCommand(MethodInfo methodInfo)
+        public CommandBuilder OnCommand(MethodInfo methodInfo)
         {
             _methodInfo = methodInfo;
-            await Build();
+            return this;
         }
 
-        private async Task Build() => await Task.Run(() => _cService.commands = _cService.commands.Append(new DiscordCommand(this)));
+        public DiscordCommand Build() => new DiscordCommand(this);
     }
 }

@@ -8,6 +8,8 @@ using MrServer.Bot.Commands.Permissions;
 using MrServerPackets.Discord.Models.Guilds;
 using MrServer.Bot.Commands.Attributes;
 using MrServer.Bot.Commands.Attributes.Permissions;
+using MrServerPackets.Discord.Entities;
+using System.Drawing;
 
 namespace MrServer.Bot.Commands.Nodes
 {
@@ -24,13 +26,45 @@ namespace MrServer.Bot.Commands.Nodes
         [Command("Help")]
         public async Task Help()
         {
-            IEnumerable<DiscordCommand> viewable = Context.Discord.cService.commands.Where(cc => !cc.IsHidden);
+            IEnumerable<DiscordCommand> viewable = Context.Discord.cService.commands.Where(cc => cc.Permissions.Select(p => p.GetType() == typeof(Hidden)).Count() == 1);
 
-            string toReturn = $"Hey {Context.Message.Author.Mention}, here's a list of current commands:```swift\n";
+            EmbedBuilder eb = new EmbedBuilder();
 
-            Tool.ForEach(viewable, (c) => { toReturn += $"\n• {c.CMD}"; });
+            eb.Description = $"Hey {Context.Message.Author.Mention}, here's a list of current commands:";
 
-            await Context.Channel.SendMessageAsync($"{toReturn}```");
+            string toField = $"";
+
+            string nodeName = string.Empty;
+            string nodeEmoji = string.Empty;
+
+            Tool.ForEach(viewable, (c) => 
+            {
+                if (nodeName != c.Node)
+                {
+                    if (eb.Fields.Count > 0) eb.Fields[eb.Fields.Count - 1].Value = toField;
+
+                    nodeName = c.Node;
+                    toField = "\u200b";
+
+                    if (c.Node == "Osu") nodeEmoji = "<:STD:415867031087480833>";
+                    else if (c.Node == "System") nodeEmoji = "💡";
+
+                    eb.AddField(x =>
+                    {
+                        x.Name = $"{nodeName} {nodeEmoji}";
+                        x.IsInline = true;
+                    });
+                }
+
+
+                toField += $"\t•**`{c.CMD}`**\n";
+            });
+
+            if(eb.Fields.Count > 0) eb.Fields[eb.Fields.Count - 1].Value = toField;
+
+            eb.Color = Color.FromArgb(28, 164, 185);
+
+            await Context.Channel.SendMessageAsync(string.Empty, eb.Build());
         }
     }
 }

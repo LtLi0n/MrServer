@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace MrServer.Bot.Commands.Nodes
 {
     [CommandNode("Owner")]
-    [RequireOwner]
+    [Hidden] [RequireOwner]
     class OwnerNode : ICommandNode
     {
         private OsuSQL OsuDB => Program.Entry.DataBases.OsuDB;

@@ -17,7 +17,7 @@ namespace MrServer.Bot.Commands
 {
     public class CommandService
     {
-        private IEnumerable<MethodInfo> _commands { get; set; }
+        private IEnumerable<MethodInfo> _methods { get; set; }
 
         public IEnumerable<DiscordCommand> commands;
 
@@ -81,9 +81,9 @@ namespace MrServer.Bot.Commands
 
                 PermissionAttribute[] nodePermissions = node.GetCustomAttributes<PermissionAttribute>().ToArray();
 
-                Tool.ForEach(methods, async (m) =>
+                Tool.ForEach(methods, (m) =>
                 {
-                    Command command = m.GetCustomAttribute(typeof(Command)) as Command;
+                    Command command = m.GetCustomAttribute<Command>();
 
                     CommandBuilder cb = CreateCommand(command.Name);
 
@@ -99,7 +99,7 @@ namespace MrServer.Bot.Commands
                         {
                             bool optional = false;
 
-                            ParameterType type = ParameterType.Optional;
+                            ParameterType type = parameters[i].HasDefaultValue ? ParameterType.Optional : ParameterType.Required;
 
                             if (parameters[i].GetCustomAttribute(typeof(Remainder)) != null)
                             {
@@ -113,17 +113,16 @@ namespace MrServer.Bot.Commands
 
                             cb.AddParameter(parameters[i].Name, type);
                         }
-
-                        Tool.ForEach(nodePermissions, p => cb.AddPermission(p));
                     }
                     //Attributes [Permissions]
                     {
                         IEnumerable<PermissionAttribute> attributes = m.GetCustomAttributes<PermissionAttribute>();
 
                         Tool.ForEach(attributes, x => cb.AddPermission(x));
+                        Tool.ForEach(nodePermissions, p => cb.AddPermission(p));
                     }
 
-                    await cb.OnCommand(m);
+                    commands = commands.Append(cb.OnCommand(m).Build());
                 });
             }
 
