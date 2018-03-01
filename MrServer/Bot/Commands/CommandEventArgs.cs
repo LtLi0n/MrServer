@@ -4,7 +4,6 @@ using MrServer.Network;
 using MrServerPackets;
 using MrServerPackets.Discord.Models;
 using MrServerPackets.Discord.Models.Guilds;
-using MrServerPackets.Discord.Models.Messages;
 using MrServerPackets.Discord.Packets;
 using MrServerPackets.Headers;
 using System;
@@ -17,10 +16,9 @@ namespace MrServer.Bot.Commands
     public class CommandEventArgs
     {
         public string[] args;
-        public NetworkHandler network;
 
-        public IMessage Message { get; }
-        public Channel Channel { get; }
+        public SocketUserMessage Message { get; }
+        public SocketChannel Channel => Message.Channel;
 
         private CommandService cService { get; set; }
         public DiscordClient Discord => cService.Discord;
@@ -28,12 +26,10 @@ namespace MrServer.Bot.Commands
         public CommandEventArgs(
             string input,
             IEnumerable<CommandParameter> parameters,
-            IMessage message,
+            SocketUserMessage message,
             CommandService cService,
             NetworkHandler network)
         {
-            this.network = network;
-            Channel = new Channel(this, message.Channel);
             Message = message;
             this.cService = cService;
 

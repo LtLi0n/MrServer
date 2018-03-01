@@ -5,13 +5,13 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
-using MrServerPackets.Discord.Models.Messages;
 using System.Linq;
 using MrServer.Bot.Commands.Nodes;
 using MrServer.Additionals.Tools;
 using MrServer.Bot.Commands.Attributes;
 using System.Reflection;
 using MrServer.Bot.Commands.Attributes.Permissions;
+using MrServer.Bot.Models;
 
 namespace MrServer.Bot.Commands
 {
@@ -34,52 +34,44 @@ namespace MrServer.Bot.Commands
             Init().GetAwaiter().GetResult();
         }
 
-        /*public async Task WaitUntilLoaded()
-        {
-            IEnumerable<ICommandNode> loadingNodes = new List<ICommandNode>(_nodes.Where(x => !x.Loaded));
-
-            while(loadingNodes.Count() > 0)
-            {
-                loadingNodes = loadingNodes.Where(x => !x.Loaded);
-
-                await Task.Delay(1);
-            }
-        }*/
-
         public CommandBuilder CreateCommand(string cmd) => new CommandBuilder(cmd, this);
 
         public DiscordCommand Command(string cmd) => commands.Where(x => x.CMD == cmd).First();
 
         //Try to find the command and execute it
-        public Task ExecuteAsync(string cmd, string input, IMessage Message, bool IgnoreCase = true)
+        public Task ExecuteAsync(string cmd, string input, SocketUserMessage Message, bool IgnoreCase = true)
         {
             Tool.ForEach(commands, async (c) =>
             {
                 if(IgnoreCase ? c.CMD.ToLower() == cmd.ToLower() : c.CMD == cmd)
                 {
-                    await c.RunAsync(new CommandEventArgs(
-                        input: input,
-                        parameters: c.Parameters,
-                        message: Message,
-                        cService: this,
-                        network: Discord.network));
+                    try
+                    {
+                        await c.RunAsync(new CommandEventArgs(
+                            input: input,
+                            parameters: c.Parameters,
+                            message: Message,
+                            cService: this,
+                            network: Discord.network));
+                    }
+                    catch(Exception e) { await Message.Channel.SendMessageAsync(e.Message); }
+
                 }
             });
 
             return Task.CompletedTask;
         }
 
+        ///<summary>Using reflection grabs every command node and loads all commands into the server.</summary>
         public Task Init()
         {
-            IEnumerable<MethodInfo> commandMethods = Enumerable.Empty<MethodInfo>();
-
             IEnumerable<Type> nodes = Assembly.GetExecutingAssembly().GetTypes().Where(x => x.GetCustomAttribute<CommandNode>() != null);
 
             foreach (Type node in nodes)
             {
                 IEnumerable<MethodInfo> methods = node.GetMethods().Where(x => x.GetCustomAttribute<Command>() != null);
 
-                PermissionAttribute[] nodePermissions = node.GetCustomAttributes<PermissionAttribute>().ToArray();
+                IEnumerable<PermissionAttribute> nodePermissions = node.GetCustomAttributes<PermissionAttribute>();
 
                 Tool.ForEach(methods, (m) =>
                 {
@@ -87,7 +79,7 @@ namespace MrServer.Bot.Commands
 
                     CommandBuilder cb = CreateCommand(command.Name);
 
-                    //Params
+                    //Parameters
                     {
                         ParameterInfo[] parameters = m.GetParameters();
 
@@ -114,7 +106,7 @@ namespace MrServer.Bot.Commands
                             cb.AddParameter(parameters[i].Name, type);
                         }
                     }
-                    //Attributes [Permissions]
+                    //Permissions
                     {
                         IEnumerable<PermissionAttribute> attributes = m.GetCustomAttributes<PermissionAttribute>();
 

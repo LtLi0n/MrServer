@@ -11,7 +11,6 @@ using Newtonsoft.Json;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using MrServerPackets.Discord.Models;
-using MrServerPackets.Discord.Models.Messages;
 using MrServerPackets.Discord.Models.Guilds;
 
 namespace MrServer.Network
@@ -162,24 +161,16 @@ namespace MrServer.Network
 
                     if (length > 0) json = Encoding.Unicode.GetString(pr_data.ReadBytes(length));
 
-                    if(pr_h1.Header == Header.State)
-                    {
-                        var StateHeader = pr_h2.ReadSubHeader<StateHeader>();
-
-                        if(StateHeader == StateHeader.Check)
-                        {
-                            PacketWriter pw = new PacketWriter(Header.State);
-                            pw.WriteHeader(StateHeader.Alive);
-                            client.Client.Send(pw.GetBytes());
-                        }
-                    }
-                    else if(pr_h1.Header == Header.Discord)
+                    if(pr_h1.Header == Header.Discord)
                     {
                         var DiscordHeader = pr_h2.ReadSubHeader<DiscordPacketTypeHeader>();
 
                         if (DiscordHeader == DiscordPacketTypeHeader.GuildMessage_Receive)
                         {
-                            OnDiscordMessageReceived(new DiscordMessageReceivedEventArgs(JsonConvert.DeserializeObject<GuildMessage>(json)));
+                            JsonSerializerSettings jsonSettings = new JsonSerializerSettings();
+                            jsonSettings.TypeNameHandling = TypeNameHandling.Auto;
+
+                            OnDiscordMessageReceived(new DiscordMessageReceivedEventArgs(JsonConvert.DeserializeObject<UserMessage>(json, jsonSettings), this));
                         }
                     }
                 }

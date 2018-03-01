@@ -1,4 +1,5 @@
-﻿using MrServerPackets.Discord.Models.Guilds;
+﻿using MrServerPackets.Discord.Models;
+using MrServerPackets.Discord.Models.Guilds;
 using System;
 using System.Collections.Generic;
 using System.Text;

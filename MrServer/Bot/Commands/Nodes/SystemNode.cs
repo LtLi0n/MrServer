@@ -17,6 +17,10 @@ namespace MrServer.Bot.Commands.Nodes
     [RequireRole(417325871838265356)]
     public class SystemNode : ICommandNode
     {
+        [Command("test")]
+        [Hidden]
+        public async Task Test(string text1, string text2) => await Context.Channel.SendMessageAsync(text1 + text2);
+
         [Command("Echo")]
         public async Task Echo([Remainder]string text) => await Context.Channel.SendMessageAsync(text);
 

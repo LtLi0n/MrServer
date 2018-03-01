@@ -10,8 +10,8 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using MrServerPackets;
 using MrServerPackets.Headers;
-using MrServerPackets.Discord.Models.Messages;
 using MrServerPackets.Discord.Models.Guilds;
+using MrServer.Bot.Models;
 
 namespace MrServer.Bot.Client
 {
@@ -37,11 +37,11 @@ namespace MrServer.Bot.Client
 
         private async void NetworkHandler_DiscordMessageReceived(object sender, DiscordMessageReceivedEventArgs e)
         {
-            if (e.Message.Author.IsBot) return;
+            if (e.Message. Author.IsBot) return;
 
             if(!string.IsNullOrEmpty(e.Message.Content))
             {
-                GuildMessage guildMessage = e.Message as GuildMessage;
+                SocketUserMessage guildMessage = e.Message as SocketUserMessage;
 
                 //Trigger command response
                 if (e.Message.Content.Substring(0, PREFIX.Length) == PREFIX)
@@ -57,15 +57,13 @@ namespace MrServer.Bot.Client
 
                     try
                     {
-                        await cService.ExecuteAsync(e.Message.Content.Split(' ')[0].Remove(0, PREFIX.Length), input, e.Message);
+                        await cService.ExecuteAsync(e.Message.Content.Split(' ')[0].Remove(0, PREFIX.Length), input, guildMessage);
                     }
                     catch (Exception ee)
                     {
-
+                        Console.WriteLine(ee);
                     }
                 }
-
-                guildMessage.WriteColored();
             }
         }
 
@@ -74,12 +72,12 @@ namespace MrServer.Bot.Client
             PacketWriter pw = new PacketWriter(Header.Discord);
             pw.WriteHeader(DiscordPacketTypeHeader.SendMessage_GuildChannel);
 
-            pw.WriteJSON(new GuildMessagePacket { Content = content, Channel = new IChannel { ID = channelID }, Guild = new Guild { ID = guildID }, Embed = Embed });
+            pw.WriteJSON(new GuildMessagePacket { Content = content, Channel = new GuildChannel(new Channel() { ID = channelID }, new Guild() { ID = guildID}), Embed = Embed });
 
             await network.Send<DataTCP>(pw.GetBytes(), network.DiscordTCP);
         }
 
-        public async Task SendDMMessageAsync(string Content, User User, Embed Embed = null)
+        public async Task SendDMMessageAsync(string Content, SocketUser User, Embed Embed = null)
         {
             PacketWriter pw = new PacketWriter(Header.Discord);
             pw.WriteHeader(DiscordPacketTypeHeader.SendMessage_DM);

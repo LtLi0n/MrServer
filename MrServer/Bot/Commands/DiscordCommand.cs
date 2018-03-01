@@ -9,6 +9,8 @@ using System.Linq.Expressions;
 using MrServer.Bot.Commands.Nodes;
 using MrServer.Bot.Commands.Attributes.Permissions;
 using MrServer.Bot.Commands.Attributes;
+using MrServer.Bot.Models;
+using MrServerPackets.Discord.Models;
 
 namespace MrServer.Bot.Commands
 {
@@ -41,7 +43,7 @@ namespace MrServer.Bot.Commands
 
         public async Task RunAsync(CommandEventArgs e)
         {
-            if (e.Message.Channel.ID != 409677778405818368 && e.Message.Channel.ID != 417690504512274452)
+            if (e.Channel.ID != 409677778405818368 && e.Channel.ID != 417690504512274452)
             {
                 await e.Channel.SendMessageAsync("Commands don't work in unaccepted channels.");
                 return;
@@ -55,21 +57,21 @@ namespace MrServer.Bot.Commands
             {
                 if (ToPermission<RequireRole>(_permissions[i], out RequireRole permRole))
                 {
-                    if (((GuildMessage)e.Message).Author.RoleIDs.Count(x => x == permRole.ID) != 1)
+                    if (((SocketGuildUser)e.Message.Author).RoleIDs.Count(x => x == permRole.ID) != 1)
                     {
                         notMet.Add((permRole, $"You don't have role id: `{permRole.ID}`."));
                     }
                 }
                 else if (ToPermission<RequireOwner>(_permissions[i], out RequireOwner permOwner))
                 {
-                    if (!((((GuildMessage)e.Message).Author).ID == permOwner.ID))
+                    if (e.Message.Author.ID != permOwner.ID)
                     {
                         notMet.Add((permOwner, "What do we have here :eyes:"));
                     }
                 }
                 else if (ToPermission<RequireGuildPermission>(_permissions[i], out RequireGuildPermission permGuild))
                 {
-                    if (!((((GuildMessage)e.Message).Author).Permissions.HasFlag(permGuild.GuildPermission)))
+                    if (!(((SocketGuildUser)e.Message.Author).Permissions.HasFlag(permGuild.GuildPermission)))
                     {
                         GuildPermission[] guildPerms = Enum.GetValues(typeof(GuildPermission)).Cast<GuildPermission>().Where(x => permGuild.GuildPermission.HasFlag(x)).ToArray();
 
