@@ -12,6 +12,8 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using MrServerPackets.Discord.Models;
 using MrServerPackets.Discord.Models.Guilds;
+using MrServer.Bot.Models;
+using MrServer.Bot.Client;
 
 namespace MrServer.Network
 {
@@ -33,6 +35,8 @@ namespace MrServer.Network
         public delegate void DiscordMessageReceivedEventHandler(object sender, DiscordMessageReceivedEventArgs e);
         public event DiscordMessageReceivedEventHandler DiscordMessageReceived;
         protected virtual void OnDiscordMessageReceived(DiscordMessageReceivedEventArgs e) => DiscordMessageReceived?.Invoke(this, e);
+
+        public List<SocketMessage> DiscordMessages { get; set; }
 
         //UDP receive thread needs fixing
         //Currently no use of UDP anyway
@@ -58,15 +62,13 @@ namespace MrServer.Network
             udpListener = new UdpClient(address);
 
             receiveThread = new Thread(_Start);
-            //receiveThreadUDP = new Thread(UdpThread);
+            DiscordMessages = new List<SocketMessage>();
         }
 
         public void Start()
         {
             running = true;
             receiveThread.Start();
-
-            //receiveThreadUDP.Start();
         }
 
         public void Stop() => running = false;
@@ -114,7 +116,7 @@ namespace MrServer.Network
                 {
                     bool disconnected = false;
 
-                    while (client.Available < 4)
+                    while (client.Available < 8)
                     {
                         if (!client.Connected)
                         {
@@ -150,6 +152,8 @@ namespace MrServer.Network
                         //If there is data, proceed to read it
                         if(length > 0)
                         {
+                            while(client.Available < length) await Task.Delay(1);
+
                             //Data
                             byte[] dataB = new byte[length];
                             client.GetStream().Read(dataB, 0, length);
@@ -163,9 +167,9 @@ namespace MrServer.Network
 
                     if(pr_h1.Header == Header.Discord)
                     {
-                        var DiscordHeader = pr_h2.ReadSubHeader<DiscordPacketTypeHeader>();
+                        var DiscordHeader = pr_h2.ReadSubHeader<DiscordHeader>();
 
-                        if (DiscordHeader == DiscordPacketTypeHeader.GuildMessage_Receive)
+                        if (DiscordHeader == DiscordHeader.ReceiveMessage)
                         {
                             JsonSerializerSettings jsonSettings = new JsonSerializerSettings();
                             jsonSettings.TypeNameHandling = TypeNameHandling.Auto;

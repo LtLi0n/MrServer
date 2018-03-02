@@ -1,4 +1,5 @@
-﻿using MrServer.Bot.Commands;
+﻿using MrServer.Bot.Client;
+using MrServer.Bot.Commands;
 using MrServer.Network;
 using MrServerPackets;
 using MrServerPackets.Discord.Models;
@@ -14,6 +15,8 @@ namespace MrServer.Bot.Models
 {
     public class SocketGuildChannel : SocketChannel
     {
+        private DiscordClient _discord => Program.Entry.DiscordClient;
+
         public SocketGuild Guild { get; }
 
         public SocketGuildChannel(SocketGuild guild, SocketChannel channel) : base(channel)
@@ -24,16 +27,28 @@ namespace MrServer.Bot.Models
             base.Name = channel.Name;
         }
 
-        public override async Task SendMessageAsync(string content, Embed embed = null)
+        public override async Task<SocketUserMessage> SendMessageAsync(string content, Embed embed = null)
         {
             PacketWriter pw = new PacketWriter(Header.Discord);
-            pw.WriteHeader(DiscordPacketTypeHeader.SendMessage_GuildChannel);
+            pw.WriteHeader(DiscordHeader.SendMessage);
 
-            var packet = new GuildMessagePacket { Content = content, Channel = new GuildChannel(this, Guild), Embed = embed };
+            MessagePacket packet = new GuildMessagePacket(
+                new GuildChannel(new Guild() { ID = Guild.ID }, this),
+                new MessagePacket(new Message()
+                {
+                    Content = content,
+                    Embed = embed
+                }));
 
-            pw.WriteJSON(packet);
+            string json = JsonConvert.SerializeObject(packet, new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Auto });
+
+            pw.WriteJSON(packet, true);
 
             await _network.Send<DataTCP>(pw.GetBytes(), _network.DiscordTCP);
+
+            return await _discord.GetBotMessageAsync(this, content, embed);
         }
+
+        public GuildChannel CommunicationGuild => new GuildChannel(Guild.CommunicationGuild, base.CommunicationChannel);
     }
 }

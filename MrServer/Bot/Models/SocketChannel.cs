@@ -1,4 +1,5 @@
-﻿using MrServer.Bot.Commands;
+﻿using MrServer.Bot.Client;
+using MrServer.Bot.Commands;
 using MrServer.Network;
 using MrServerPackets;
 using MrServerPackets.Discord.Models;
@@ -33,6 +34,12 @@ namespace MrServer.Bot.Models
             base.Name = channel.Name;
         }
 
-        public virtual Task SendMessageAsync(string content, Embed embed = null) => Task.CompletedTask;
+        public virtual Task<SocketUserMessage> SendMessageAsync(string content, Embed embed = null) => throw new NotImplementedException();
+
+        public Channel CommunicationChannel => new Channel
+        {
+            ID = base.ID,
+            Name = base.Name
+        };
     }
 }

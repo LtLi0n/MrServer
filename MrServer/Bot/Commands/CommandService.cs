@@ -39,8 +39,10 @@ namespace MrServer.Bot.Commands
         public DiscordCommand Command(string cmd) => commands.Where(x => x.CMD == cmd).First();
 
         //Try to find the command and execute it
-        public Task ExecuteAsync(string cmd, string input, SocketUserMessage Message, bool IgnoreCase = true)
+        public Task<bool> ExecuteAsync(string cmd, string input, SocketUserMessage Message, bool IgnoreCase = true)
         {
+            bool success = false;
+
             Tool.ForEach(commands, async (c) =>
             {
                 if(IgnoreCase ? c.CMD.ToLower() == cmd.ToLower() : c.CMD == cmd)
@@ -53,13 +55,16 @@ namespace MrServer.Bot.Commands
                             message: Message,
                             cService: this,
                             network: Discord.network));
+
+                        success = true;
+                        return;
                     }
-                    catch(Exception e) { await Message.Channel.SendMessageAsync(e.Message); }
+                    catch(Exception e) { await Message.Channel.SendMessageAsync(e.Message); return; }
 
                 }
             });
 
-            return Task.CompletedTask;
+            return Task.FromResult(success);
         }
 
         ///<summary>Using reflection grabs every command node and loads all commands into the server.</summary>

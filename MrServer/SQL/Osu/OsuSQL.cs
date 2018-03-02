@@ -102,28 +102,37 @@ namespace MrServer.SQL.Osu
             if (LastDailyReset.AddDays(1).Ticks < DateTime.Now.Ticks)
             {
                 Console.WriteLine("Daily TotalHit data is being reset...");
-                await ResetTotalHits<ResetType.ResetDaily>(users_std_ID, OsuGameModes.STD);
-                await ResetTotalHits<ResetType.ResetDaily>(users_taiko_ID, OsuGameModes.Taiko);
-                await ResetTotalHits<ResetType.ResetDaily>(users_ctb_ID, OsuGameModes.CtB);
-                await ResetTotalHits<ResetType.ResetDaily>(users_mania_ID, OsuGameModes.Mania);
+
+                await ResetTotalHits<ResetType.ResetDaily>(
+                    (users_std_ID, OsuGameModes.STD),
+                    (users_std_ID, OsuGameModes.Taiko),
+                    (users_std_ID, OsuGameModes.CtB),
+                    (users_std_ID, OsuGameModes.Mania));
+
                 Console.WriteLine("Daily TotalHit data has been resetted!");
             }
             if (LastWeeklyReset.AddDays(7).Ticks < DateTime.Now.Ticks)
             {
                 Console.WriteLine("Weekly TotalHit data is being reset...");
-                await ResetTotalHits<ResetType.ResetWeekly>(users_std_ID, OsuGameModes.STD);
-                await ResetTotalHits<ResetType.ResetWeekly>(users_taiko_ID, OsuGameModes.Taiko);
-                await ResetTotalHits<ResetType.ResetWeekly>(users_ctb_ID, OsuGameModes.CtB);
-                await ResetTotalHits<ResetType.ResetWeekly>(users_mania_ID, OsuGameModes.Mania);
+
+                await ResetTotalHits<ResetType.ResetWeekly>(
+                    (users_std_ID, OsuGameModes.STD),
+                    (users_std_ID, OsuGameModes.Taiko),
+                    (users_std_ID, OsuGameModes.CtB),
+                    (users_std_ID, OsuGameModes.Mania));
+
                 Console.WriteLine("Weekly TotalHit data has been resetted!");
             }
             if (LastMonthlyReset.AddDays(30).Ticks < DateTime.Now.Ticks)
             {
                 Console.WriteLine("Monthly TotalHit data is being reset...");
-                await ResetTotalHits<ResetType.ResetMonthly>(users_std_ID, OsuGameModes.STD);
-                await ResetTotalHits<ResetType.ResetMonthly>(users_taiko_ID, OsuGameModes.Taiko);
-                await ResetTotalHits<ResetType.ResetMonthly>(users_ctb_ID, OsuGameModes.CtB);
-                await ResetTotalHits<ResetType.ResetMonthly>(users_mania_ID, OsuGameModes.Mania);
+
+                await ResetTotalHits<ResetType.ResetMonthly>(
+                    (users_std_ID, OsuGameModes.STD),
+                    (users_std_ID, OsuGameModes.Taiko),
+                    (users_std_ID, OsuGameModes.CtB),
+                    (users_std_ID, OsuGameModes.Mania));
+
                 Console.WriteLine("Monthly TotalHit data has been resetted!");
             }
         }
@@ -151,33 +160,37 @@ namespace MrServer.SQL.Osu
             return Task.FromResult(users.ToArray());
         }
 
-        //Reset TotalHit count to 0 for daily/weekly/monthly leaderboard
-        private async Task ResetTotalHits<T>(ulong[] usersID, OsuGameModes gameMode)
+        ///<summary>Reset TotalHit count to 0 for daily/weekly/monthly leaderboard</summary>
+        ///Arg1 - STD, Arg2 - Taiko, Arg3 - CtB, Arg4 - Mania
+        private async Task ResetTotalHits<T>(params (ulong[], OsuGameModes)[] userIDs)
         {
-            string command_update_user_str = $"UPDATE {table_name}_{GameModeString(gameMode)} SET ";
-
-            if (typeof(T) == typeof(ResetType.ResetDaily))
+            for(int i = 0; i < userIDs.LongLength; i++)
             {
-                LastDailyReset = DateTime.Now.Subtract(DateTime.Now.TimeOfDay).AddHours(ResetHour);
-                await new SQLiteCommand($"UPDATE Dates SET Date = '{LastDailyReset.Ticks}' WHERE ID = '1'", db_Connection).ExecuteNonQueryAsync();
-                command_update_user_str += "HitsDaily";
-            }
-            else if (typeof(T) == typeof(ResetType.ResetWeekly))
-            {
-                LastWeeklyReset = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day).AddDays(-((int)(DateTime.Now.DayOfWeek + 6) % 7)).AddHours(ResetHour);
-                await new SQLiteCommand($"UPDATE Dates SET Date = '{LastWeeklyReset.Ticks}' WHERE ID = '2'", db_Connection).ExecuteNonQueryAsync();
-                command_update_user_str += "HitsWeekly";
-            }
-            else if (typeof(T) == typeof(ResetType.ResetMonthly))
-            {
-                LastMonthlyReset = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1).AddHours(ResetHour);
-                await new SQLiteCommand($"UPDATE Dates SET Date = '{LastMonthlyReset.Ticks}' WHERE ID = '3'", db_Connection).ExecuteNonQueryAsync();
-                command_update_user_str += "HitsMonthly";
-            }
+                string command_update_user_str = $"UPDATE {table_name}_{GameModeString(userIDs[i].Item2)} SET ";
 
-            command_update_user_str += $"= '0' WHERE UserID = ";
+                if (typeof(T) == typeof(ResetType.ResetDaily))
+                {
+                    LastDailyReset = DateTime.Now.Subtract(DateTime.Now.TimeOfDay).AddHours(ResetHour);
+                    await new SQLiteCommand($"UPDATE Dates SET Date = '{LastDailyReset.Ticks}' WHERE ID = '1'", db_Connection).ExecuteNonQueryAsync();
+                    command_update_user_str += "HitsDaily";
+                }
+                else if (typeof(T) == typeof(ResetType.ResetWeekly))
+                {
+                    LastWeeklyReset = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day).AddDays(-((int)(DateTime.Now.DayOfWeek + 6) % 7)).AddHours(ResetHour);
+                    await new SQLiteCommand($"UPDATE Dates SET Date = '{LastWeeklyReset.Ticks}' WHERE ID = '2'", db_Connection).ExecuteNonQueryAsync();
+                    command_update_user_str += "HitsWeekly";
+                }
+                else if (typeof(T) == typeof(ResetType.ResetMonthly))
+                {
+                    LastMonthlyReset = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1).AddHours(ResetHour);
+                    await new SQLiteCommand($"UPDATE Dates SET Date = '{LastMonthlyReset.Ticks}' WHERE ID = '3'", db_Connection).ExecuteNonQueryAsync();
+                    command_update_user_str += "HitsMonthly";
+                }
 
-            foreach (int userID in usersID) await new SQLiteCommand(command_update_user_str + $"'{userID}'", db_Connection).ExecuteNonQueryAsync();
+                command_update_user_str += $"= '0' WHERE UserID = ";
+
+                foreach (int userID in userIDs[i].Item1) await new SQLiteCommand(command_update_user_str + $"'{userID}'", db_Connection).ExecuteNonQueryAsync();
+            }
         }
 
         public async Task<OsuGameModeUserDB> GetOsuGameModeUser(ulong DiscordID, OsuGameModes GameMode)
@@ -186,12 +199,7 @@ namespace MrServer.SQL.Osu
             return boundUser != null ? await GetGameModeUserBy_OsuID(boundUser.UserID, GameMode) : null;
         }
 
-        public async Task RemoveOsuGameModeUser(ulong userID, OsuGameModes gameMode = OsuGameModes.STD)
-        {
-            string command_str = $"DELETE FROM {table_name}_{GameModeString(gameMode)} WHERE UserID = '{userID}'";
-
-            await new SQLiteCommand(command_str, db_Connection).ExecuteNonQueryAsync();
-        }
+        public async Task RemoveOsuGameModeUser(ulong userID, OsuGameModes gameMode = OsuGameModes.STD) => await new SQLiteCommand($"DELETE FROM {table_name}_{GameModeString(gameMode)} WHERE UserID = '{userID}'", db_Connection).ExecuteNonQueryAsync();
 
         public async Task WriteOsuGameModeUser(OsuUser osuUser, OsuGameModes gameMode = OsuGameModes.STD)
         {
@@ -252,19 +260,17 @@ namespace MrServer.SQL.Osu
             else return null;
         }
 
-        public async Task RemoveBoundUser(ulong DiscordID)
-        {
+        public async Task RemoveBoundUser(ulong DiscordID) =>
             await new SQLiteCommand(
-                $"DELETE FROM osu_users WHERE DiscordID = '{DiscordID}'"
-                , db_Connection).ExecuteNonQueryAsync();
-        }
+                $"DELETE FROM osu_users WHERE DiscordID = '{DiscordID}'", 
+                db_Connection).ExecuteNonQueryAsync();
 
         public async Task RegisterBoundOsuUser(OsuUser OsuUser, ulong DiscordID) =>
-    await new SQLiteCommand(
-            $"INSERT INTO {table_name} " +
-            $"(DiscordID, UserID, UserName, GameModes, Country) " +
-            $"VALUES ('{DiscordID}', '{OsuUser.UserID}', '{OsuUser.UserName}', '{(byte)OsuGameModes.None}', '{OsuUser.Country}')",
-        db_Connection).ExecuteNonQueryAsync();
+            await new SQLiteCommand(
+                $"INSERT INTO {table_name} " +
+                $"(DiscordID, UserID, UserName, GameModes, Country) " +
+                $"VALUES ('{DiscordID}', '{OsuUser.UserID}', '{OsuUser.UserName}', '{(byte)OsuGameModes.None}', '{OsuUser.Country}')",
+                db_Connection).ExecuteNonQueryAsync();
 
         public async Task UpdateBoundOsuUser(OsuUser osuUser, OsuBoundUserDB boundUser) =>
             await new SQLiteCommand(
@@ -274,7 +280,7 @@ namespace MrServer.SQL.Osu
                 $"GameModes = '{(byte)boundUser.GameModes}'," +
                 $"Country = '{osuUser.Country}' " +
                 $"WHERE UserID = '{boundUser.UserID}'",
-        db_Connection).ExecuteNonQueryAsync();
+                db_Connection).ExecuteNonQueryAsync();
 
         public async Task UpdateBoundOsuUser(OsuBoundUserDB boundUser) =>
             await new SQLiteCommand(

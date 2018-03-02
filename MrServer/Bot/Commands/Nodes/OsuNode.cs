@@ -16,6 +16,7 @@ using System.Threading;
 using MrServer.Bot.Commands.Attributes;
 using System.Reflection;
 using MrServer.Bot.Commands.Attributes.Permissions;
+using MrServer.Bot.Models;
 
 namespace MrServer.Bot.Commands.Nodes
 {
@@ -43,6 +44,8 @@ namespace MrServer.Bot.Commands.Nodes
                 await Context.Channel.SendMessageAsync("Mentioned user is not binded.");
                 return;
             }
+
+            SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...");
 
             OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userName, maxAttempts: 2);
 
@@ -103,7 +106,8 @@ namespace MrServer.Bot.Commands.Nodes
                                 $"*maximum waiting time - 1 minute*";
                             }
 
-                            if (gameModeUsers.Length > 2 && i < 2) x.Value += "\n​";
+                            if (gameModeUsers.Length > 2 && i < 2) x.Value += "\n\u200b";
+                            else if (i == 0) x.Value += "\t\t\t\u200b";
 
                             x.IsInline = true;
                         });
@@ -121,8 +125,7 @@ namespace MrServer.Bot.Commands.Nodes
 
             eb.Thumbnail = $"https://a.ppy.sh/{osuUser.UserID}";
 
-
-            await Context.Channel.SendMessageAsync("", eb.Build());
+            await msg.EditAsync("", eb.Build());
         }
 
         [Command("OsuUnTrack")]

@@ -16,6 +16,12 @@ namespace MrServer.Additionals.Design
 
                 return $"{DateTime.Now.Hour}:{minutes}";
             }
+
+            
+
+        public static class Text
+        {
+
         }
     }
 }

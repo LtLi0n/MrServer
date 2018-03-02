@@ -16,10 +16,9 @@ namespace MrServer.Network.EventArgModels
 
         public DiscordMessageReceivedEventArgs(UserMessage msg, NetworkHandler network)
         {
-
             if (typeof(GuildChannel).IsAssignableFrom(msg.Channel.GetType()))
             {
-                SocketGuild guild = new SocketGuild(((GuildChannel)msg.Channel).Guild);
+                SocketGuild guild = new SocketGuild(network, ((GuildChannel)msg.Channel).Guild);
 
                 SocketGuildChannel channel = new SocketGuildChannel(guild, new SocketChannel(network, msg.Channel));
 

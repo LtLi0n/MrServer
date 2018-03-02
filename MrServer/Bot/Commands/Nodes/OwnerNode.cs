@@ -21,5 +21,12 @@ namespace MrServer.Bot.Commands.Nodes
         {
             await OsuDB.ExecuteAsync(command);
         }
+
+        [Command("SayDelete")]
+        public async Task SayDelete([Remainder]string text)
+        {
+            await Context.Message.DeleteAsync();
+            await Context.Channel.SendMessageAsync(text);
+        }
     }
 }
