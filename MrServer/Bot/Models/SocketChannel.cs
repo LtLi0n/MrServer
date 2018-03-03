@@ -17,6 +17,8 @@ namespace MrServer.Bot.Models
     {
         protected NetworkHandler _network;
 
+        protected static List<(string, DateTime)> usedIDs = new List<(string, DateTime)>();
+
         public SocketChannel(NetworkHandler network, Channel channel = null)
         {
             _network = network;
@@ -34,7 +36,7 @@ namespace MrServer.Bot.Models
             base.Name = channel.Name;
         }
 
-        public virtual Task<SocketUserMessage> SendMessageAsync(string content, Embed embed = null) => throw new NotImplementedException();
+        public virtual Task<SocketUserMessage> SendMessageAsync(string content, Embed embed = null, bool attachID = false) => throw new NotImplementedException();
 
         public Channel CommunicationChannel => new Channel
         {

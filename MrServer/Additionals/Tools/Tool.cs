@@ -10,5 +10,7 @@ namespace MrServer.Additionals.Tools
         {
             foreach (T item in enumeration) action(item);
         }
+
+        public static string RandomString(int length = 20) => Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Substring(0, length);
     }
 }

@@ -29,7 +29,8 @@ namespace MrServer.Bot.Client
         public List<SocketMessage> Messages { get { return network.DiscordMessages; } set { network.DiscordMessages = value; } }
         public List<SocketUserMessage> BotMessages;
 
-        private bool waitingForBotMessage = false;
+        private bool waitingForBotMessage => waitingForBotMessages > 0;
+        private int waitingForBotMessages = 0;
 
         public DiscordClient(NetworkHandler NetworkHandler)
         {
@@ -46,31 +47,41 @@ namespace MrServer.Bot.Client
 
         public async Task<SocketUserMessage> GetBotMessageAsync(SocketChannel channel, string content, Embed embed)
         {
-            waitingForBotMessage = true;
+            waitingForBotMessages++;
 
             while (true)
             {
                 if(BotMessages.Count > 0)
                 {
-                    SocketUserMessage toCheck = BotMessages.Last();
-                    BotMessages.Remove(toCheck);
-
-                    if (toCheck.Channel.ID == channel.ID && toCheck.Content == content)
+                    for(int i = 0; i < BotMessages.Count; i++)
                     {
-                        waitingForBotMessage = false;
-                        return toCheck;
+                        if (BotMessages[i].Channel.ID == channel.ID && BotMessages[i].Content == content && BotMessages[i].Embed == embed)
+                        {
+                            SocketUserMessage toReturn = BotMessages[i];
+
+                            BotMessages.Remove(toReturn);
+
+                            return toReturn;
+                        }
                     }
+
                 }
 
                 await Task.Delay(1);
             }
+
+            waitingForBotMessages--;
         }
 
         private async void NetworkHandler_DiscordMessageReceived(object sender, DiscordMessageReceivedEventArgs e)
         {
             SocketUserMessage userMsg = e.Message as SocketUserMessage;
 
-            if (userMsg.Author.ID == ID_BOT && waitingForBotMessage) BotMessages.Add(e.Message);
+            if (userMsg.Author.ID == ID_BOT)
+            {
+                if(!waitingForBotMessage) BotMessages.RemoveAll(x => (DateTime.Now - x.CreatedAt).Minutes > 5);
+                BotMessages.Add(e.Message);
+            }
 
             if (e.Message.Author.IsBot) return;
 

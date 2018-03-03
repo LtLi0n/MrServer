@@ -45,7 +45,7 @@ namespace MrServer.Bot.Commands.Nodes
                 return;
             }
 
-            SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...");
+            SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
 
             OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userName, maxAttempts: 2);
 

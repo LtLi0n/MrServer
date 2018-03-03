@@ -18,6 +18,7 @@ namespace MrServer.Additionals.Design
             }
 
             
+        }
 
         public static class Text
         {
