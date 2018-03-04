@@ -17,6 +17,10 @@ using MrServer.Bot.Commands.Attributes;
 using System.Reflection;
 using MrServer.Bot.Commands.Attributes.Permissions;
 using MrServer.Bot.Models;
+using MrServer.Network.Osu;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using MrServerPackets.Discord.Models;
 
 namespace MrServer.Bot.Commands.Nodes
 {
@@ -118,12 +122,12 @@ namespace MrServer.Bot.Commands.Nodes
             eb.WithAuthor(x =>
             {
                 x.IconUrl = $"https://images-ext-2.discordapp.net/external/sBhebNjHsypWWjDEqpVLu303x-bnOQ7AlxIKozEXgtQ/https/cdn.discordapp.com/attachments/202046273052868608/355446459514093579/mode-osu-med.png";
-                x.Name = $"{osuUser.UserName}";
+                x.Name = $"{osuUser.Username}";
             });
 
             eb.Color = Color.LightPink;
 
-            eb.Thumbnail = $"https://a.ppy.sh/{osuUser.UserID}";
+            eb.Thumbnail = osuUser.AvatarURL;
 
             await msg.EditAsync("", eb.Build());
         }
@@ -225,6 +229,120 @@ namespace MrServer.Bot.Commands.Nodes
 
                 await Context.Channel.SendMessageAsync($"UnBinded {boundUser.UserName} from `{OsuSQL.table_name}`.");
             }
+        }
+
+        [Command("Beatmap")]
+        [RequireOwner]
+        [Hidden]
+        public async Task GetBeatmap(string ID, string action = null)
+        {
+            SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
+
+            OsuBeatmap beatmap = await OsuNetwork.DownloadOsuBeatmap(int.Parse(ID), false);
+
+            OsuUser creator = await OsuNetwork.DownloadOsuUser(beatmap.Creator, maxAttempts: 3);
+            Task<OsuScore[]> bestPlayDownloader = OsuNetwork.DownloadOsuBeatmapScores(beatmap, 3);
+
+            EmbedBuilder eb = new EmbedBuilder();
+
+            eb.Thumbnail = $"https://b.ppy.sh/thumb/{beatmap.BeatmapSetID}l.jpg";
+            eb.Author = new EmbedAuthorBuilder()
+            {
+                IconUrl = GetDifficultyIconURL(beatmap.Difficulty.Rating, beatmap.GameMode),
+                Name = $"{beatmap.Title} ({beatmap.Version})",
+                Url = $"https://osu.ppy.sh/b/{beatmap.BeatmapID}&m={(byte)beatmap.GameMode}"
+            };
+
+            eb.Color = Color.FromArgb(28, 164, 185);
+
+            eb.Description = 
+                $"Created by: **[{creator.Username}](https://osu.ppy.sh/u/{creator.UserID})**\n" +
+                $"📥 **[Download](https://osu.ppy.sh/d/{beatmap.BeatmapSetID}n)** 🖼 [With Video](https://osu.ppy.sh/d/{beatmap.BeatmapSetID})";
+
+            eb.AddField(x =>
+            {
+                x.Name = $"{string.Format("{0:0.##}", beatmap.Difficulty.Rating)} ⭐ {beatmap.Length} ⏱";
+                x.Value =
+                $"AR: **{beatmap.Difficulty.Approach}** • CS: **{beatmap.Difficulty.Size}** • OD: **{beatmap.Difficulty.Overall}** • Drain: **{beatmap.Difficulty.Drain}**\n" +
+                $"BPM: **{beatmap.BPM}**";
+                x.IsInline = true;
+            });
+
+            eb.AddField(x =>
+            {
+                x.Name = $"{beatmap.FavouriteCount} ❤️";
+                x.Value =
+                $"• Plays: **{beatmap.PlayCount}**\n" +
+                $"• Passes: **{beatmap.PassCount}**";
+
+                x.IsInline = true;
+            });
+
+            OsuScore[] bestPlays = await bestPlayDownloader;
+
+            await msg.EditAsync("Fetching best plays...", null);
+
+            if (bestPlays != null)
+            {
+                EmbedFieldBuilder rankingsField = new EmbedFieldBuilder();
+
+                rankingsField.Name = "🏆";
+                rankingsField.Value = "report to LtLi0n";
+
+                for (int i = 0; i < bestPlays.Length; i++)
+                {
+                    OsuUser bestPlayUser = await OsuNetwork.DownloadOsuUser(bestPlays[i].Username);
+
+                    string toAdd = $"`#{i + 1}` :flag_{bestPlayUser.Country.ToLower()}: {bestPlays[i].Username} • Score: **{bestPlays[i].Score.ToString("#,#", CultureInfo.InvariantCulture)}**\n";
+
+                    if (i == 0) rankingsField.Value = toAdd;
+                    else rankingsField.Value += toAdd;
+                }
+
+                rankingsField.IsInline = true;
+
+                eb.AddField(rankingsField);
+            }
+
+            eb.Footer = new EmbedFooterBuilder()
+            {
+                Text = $"Ranked: {beatmap.ApprovalDate.ToShortDateString()} • Last Update: {beatmap.LastUpdate.ToShortDateString()}",
+                IconUrl = creator != null ? creator.AvatarURL : string.Empty
+            };
+
+            string additional = string.Empty;
+
+            if (action != null) additional = action.ToLower() == "json" ? $"```json\n{JValue.Parse(JsonConvert.SerializeObject(beatmap)).ToString(Formatting.Indented)}```" : string.Empty;
+
+            try
+            {
+                Embed embed = eb.Build();
+
+                await msg.EditAsync((additional), embed: embed);
+            }
+            catch(Exception e) { Console.WriteLine(e); }
+            
+        }
+
+        private string GetDifficultyIconURL(float rating, OsuGameModes gameMode)
+        {
+            string diffIcon = string.Empty;
+
+            if (rating < 1.50) diffIcon = "easy";
+            else if (rating < 2.25) diffIcon = "normal";
+            else if (rating < 3.75) diffIcon = "hard";
+            else if (rating < 5.25) diffIcon = "insane";
+            else if (rating < 6.75) diffIcon = "expert";
+            else diffIcon = "expert";
+
+            switch (gameMode)
+            {
+                case OsuGameModes.Taiko: diffIcon += "-t"; break;
+                case OsuGameModes.CtB: diffIcon += "-f"; break;
+                case OsuGameModes.Mania: diffIcon += "-m"; break;
+            }
+
+            return $"https://s.ppy.sh/images/{diffIcon}.png";
         }
     }
 }

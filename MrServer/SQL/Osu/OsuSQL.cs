@@ -269,14 +269,14 @@ namespace MrServer.SQL.Osu
             await new SQLiteCommand(
                 $"INSERT INTO {table_name} " +
                 $"(DiscordID, UserID, UserName, GameModes, Country) " +
-                $"VALUES ('{DiscordID}', '{OsuUser.UserID}', '{OsuUser.UserName}', '{(byte)OsuGameModes.None}', '{OsuUser.Country}')",
+                $"VALUES ('{DiscordID}', '{OsuUser.UserID}', '{OsuUser.Username}', '{(byte)OsuGameModes.None}', '{OsuUser.Country}')",
                 db_Connection).ExecuteNonQueryAsync();
 
         public async Task UpdateBoundOsuUser(OsuUser osuUser, OsuBoundUserDB boundUser) =>
             await new SQLiteCommand(
                 $"UPDATE {table_name} " +
                 $"SET " +
-                $"UserName = '{osuUser.UserName}'," +
+                $"UserName = '{osuUser.Username}'," +
                 $"GameModes = '{(byte)boundUser.GameModes}'," +
                 $"Country = '{osuUser.Country}' " +
                 $"WHERE UserID = '{boundUser.UserID}'",

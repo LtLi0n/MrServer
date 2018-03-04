@@ -26,6 +26,7 @@ namespace MrServer.Bot.Models
             base.CreatedAt = message.CreatedAt;
             base.Embed = message.Embed;
             base.ID = message.ID;
+            base.UniqueID = message.UniqueID;
 
             _network = network;
         }
@@ -36,7 +37,8 @@ namespace MrServer.Bot.Models
             Content = base.Content,
             CreatedAt = base.CreatedAt,
             Embed = base.Embed,
-            ID = base.ID
+            ID = base.ID,
+            UniqueID = base.UniqueID
         };
 
         public MessagePacket ToMessagePacket(string action) => new MessagePacket(CommunicationMessage, action);

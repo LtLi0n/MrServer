@@ -44,7 +44,7 @@ namespace MrServer.Bot.Commands
 
             for (int i = 0; i < paramArr.Length; i++)
             {
-                if (argIndex + 1 > argsTemp.Count)
+                if (argIndex + 1 > argsTemp.Count && paramArr[i].Type != ParameterType.Optional)
                 {
                     string expectedParameters = "";
 
@@ -59,11 +59,14 @@ namespace MrServer.Bot.Commands
 
                 if (paramArr[i].Type == ParameterType.Optional)
                 {
-                    if (!string.IsNullOrEmpty(argsTemp[argIndex]))
+                    if(argsTemp.Count > argIndex)
                     {
-                        correctArgs.Add(argsTemp[argIndex]);
-                        argIndex++;
-                        optionalUsed = true;
+                        if (!string.IsNullOrEmpty(argsTemp[argIndex]))
+                        {
+                            correctArgs.Add(argsTemp[argIndex]);
+                            argIndex++;
+                            optionalUsed = true;
+                        }
                     }
                 }
                 else
@@ -91,6 +94,8 @@ namespace MrServer.Bot.Commands
                     }
                 }
             }
+
+            for (; correctArgs.Count < paramArr.Length;) correctArgs.Add(null); // fill with null values because reflection is stupid enough that optional parameters still NEED to be null
 
             args = correctArgs.ToArray();
         }

@@ -27,14 +27,14 @@ namespace MrServer.Bot.Client
         public string PREFIX { get; private set; }
 
         public List<SocketMessage> Messages { get { return network.DiscordMessages; } set { network.DiscordMessages = value; } }
-        public List<SocketUserMessage> BotMessages;
+        public List<SocketUserMessage> TrackedMessages;
 
         private bool waitingForBotMessage => waitingForBotMessages > 0;
         private int waitingForBotMessages = 0;
 
         public DiscordClient(NetworkHandler NetworkHandler)
         {
-            BotMessages = new List<SocketUserMessage>();
+            TrackedMessages = new List<SocketUserMessage>();
 
             PREFIX = "$";
             cService = new CommandService(this);
@@ -45,21 +45,21 @@ namespace MrServer.Bot.Client
             NetworkHandler.DiscordMessageReceived += NetworkHandler_DiscordMessageReceived;
         }
 
-        public async Task<SocketUserMessage> GetBotMessageAsync(SocketChannel channel, string content, Embed embed)
+        public async Task<SocketUserMessage> GetBotMessageAsync(string expectedID)
         {
             waitingForBotMessages++;
 
             while (true)
             {
-                if(BotMessages.Count > 0)
+                if(TrackedMessages.Count > 0)
                 {
-                    for(int i = 0; i < BotMessages.Count; i++)
+                    for(int i = 0; i < TrackedMessages.Count; i++)
                     {
-                        if (BotMessages[i].Channel.ID == channel.ID && BotMessages[i].Content == content && BotMessages[i].Embed == embed)
+                        if (TrackedMessages[i].UniqueID == expectedID)
                         {
-                            SocketUserMessage toReturn = BotMessages[i];
+                            SocketUserMessage toReturn = TrackedMessages[i];
 
-                            BotMessages.Remove(toReturn);
+                            TrackedMessages.Remove(toReturn);
 
                             return toReturn;
                         }
@@ -77,11 +77,7 @@ namespace MrServer.Bot.Client
         {
             SocketUserMessage userMsg = e.Message as SocketUserMessage;
 
-            if (userMsg.Author.ID == ID_BOT)
-            {
-                if(!waitingForBotMessage) BotMessages.RemoveAll(x => (DateTime.Now - x.CreatedAt).Minutes > 5);
-                BotMessages.Add(e.Message);
-            }
+            if (!string.IsNullOrEmpty(e.Message.UniqueID)) TrackedMessages.Add(e.Message);
 
             if (e.Message.Author.IsBot) return;
 

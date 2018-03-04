@@ -14,6 +14,7 @@ using MrServerPackets.Discord.Models;
 using MrServerPackets.Discord.Models.Guilds;
 using MrServer.Bot.Models;
 using MrServer.Bot.Client;
+using System.Net.Http;
 
 namespace MrServer.Network
 {
@@ -215,6 +216,25 @@ namespace MrServer.Network
         private void OnSent<T>(IAsyncResult result)
         {
 
+        }
+
+        public static async Task<string> DownloadJSON(string url, int maxAttempts)
+        {
+            using (HttpClient htppClient = new HttpClient())
+            {
+                for (int i = 0; i < maxAttempts; i++)
+                {
+                    try
+                    {
+                        string json = await htppClient.GetStringAsync(url);
+
+                        return json;
+                    }
+                    catch (Exception e) { Console.WriteLine(e.Message); }
+                }
+            }
+
+            return null;
         }
     }
 }

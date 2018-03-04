@@ -34,34 +34,29 @@ namespace MrServer.Bot.Models
             PacketWriter pw = new PacketWriter(Header.Discord);
             pw.WriteHeader(DiscordHeader.SendMessage);
 
+            Message msg = new Message()
+            {
+                Content = content,
+                Embed = embed
+            };
+
             //Attach 
             if (attachID)
             {
-                usedIDs.RemoveAll(x => (DateTime.Now - x.Item2).Minutes > 5);
-
                 string randID = Tool.RandomString();
 
                 //Well if this actually happens, I will invest all my money into lottery [1 in 1,3 * 10 ^ 36 chance]
                 //Fun fact: that's like gettings tails 100 times in a row!
                 while (usedIDs.Exists(x => x.Item1 == randID)) randID = Tool.RandomString();
 
-                if (embed == null) embed = new EmbedBuilder() { Footer = new EmbedFooterBuilder() { Text = randID } }.Build();
-                else
-                {
-                    if (embed.Footer.HasValue) embed.Footer = new EmbedFooter { Text = randID, IconUrl = embed.Footer.Value.Text };
-                    else embed.Footer = new EmbedFooter() { Text = randID };
-                }
+                msg.UniqueID = randID;
 
-                usedIDs.Add((randID, DateTime.Now));
+                usedIDs.Add((msg.UniqueID, DateTime.Now));
             }
 
             MessagePacket packet = new GuildMessagePacket(
                 new GuildChannel(new Guild() { ID = Guild.ID }, this),
-                new MessagePacket(new Message()
-                {
-                    Content = content,
-                    Embed = embed
-                }));
+                new MessagePacket(msg));
 
             string json = JsonConvert.SerializeObject(packet, new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Auto });
 
@@ -69,7 +64,7 @@ namespace MrServer.Bot.Models
 
             await _network.Send<DataTCP>(pw.GetBytes(), _network.DiscordTCP);
 
-            return await _discord.GetBotMessageAsync(this, content, embed);
+            return await _discord.GetBotMessageAsync(msg.UniqueID);
         }
 
         public GuildChannel CommunicationGuild => new GuildChannel(Guild.CommunicationGuild, base.CommunicationChannel);
