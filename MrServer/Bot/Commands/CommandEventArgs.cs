@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace MrServer.Bot.Commands
 {
@@ -33,7 +34,7 @@ namespace MrServer.Bot.Commands
             Message = message;
             this.cService = cService;
 
-            List<string> argsTemp = new List<string>(input.Split(' '));
+            List<string> argsTemp = new List<string>(input.Split(' ').Where(x => x.Length > 0));
             List<string> correctArgs = new List<string>();
 
             bool optionalUsed = false;
@@ -44,18 +45,22 @@ namespace MrServer.Bot.Commands
 
             for (int i = 0; i < paramArr.Length; i++)
             {
-                if (argIndex + 1 > argsTemp.Count && paramArr[i].Type != ParameterType.Optional)
+                if (argIndex + 1 > argsTemp.Count)
                 {
-                    string expectedParameters = "";
-
-                    foreach (CommandParameter expectedParam in paramArr)
+                    if(paramArr[i].Type != ParameterType.Optional && argIndex + 1 > argsTemp.Count && paramArr[i].Type != ParameterType.UnparsedOptional)
                     {
-                        expectedParameters += $"{expectedParam.Name} - {Enum.GetName(typeof(ParameterType), expectedParam.Type)}\n";
+                        string expectedParameters = "";
+
+                        foreach (CommandParameter expectedParam in paramArr)
+                        {
+                            expectedParameters += $"{expectedParam.Name} - {Enum.GetName(typeof(ParameterType), expectedParam.Type)}\n";
+                        }
+
+                        throw new Exception($"Not enough parameters specified.\n\nExpected:\n{expectedParameters}");
                     }
 
-                    throw new Exception($"Not enough parameters specified.\n\nExpected:\n{expectedParameters}");
+                    break;
                 }
-                    
 
                 if (paramArr[i].Type == ParameterType.Optional)
                 {
@@ -74,7 +79,7 @@ namespace MrServer.Bot.Commands
                     if (optionalUsed) throw new Exception("More optional parameters can only exist by following the first one.");
                     else
                     {
-                        if (paramArr[i].Type == ParameterType.Unparsed)
+                        if (paramArr[i].Type == ParameterType.UnparsedOptional || paramArr[i].Type == ParameterType.UnparsedRequired)
                         {
                             string mergedArgs = "";
 

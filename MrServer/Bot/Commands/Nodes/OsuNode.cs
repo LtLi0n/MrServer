@@ -21,6 +21,8 @@ using MrServer.Network.Osu;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using MrServerPackets.Discord.Models;
+using System.Linq;
+using MrServer.Additionals.Tools;
 
 namespace MrServer.Bot.Commands.Nodes
 {
@@ -41,12 +43,18 @@ namespace MrServer.Bot.Commands.Nodes
 
             OsuBoundUserDB boundUser = string.IsNullOrEmpty(userName) ? boundUser = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID) : Context.Message.Mentions.Length == 1 ? await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Mentions[0]) : await OsuDB.GetBoundUserBy_UserName(userName);
 
-            if (boundUser != null) userName = boundUser.UserName;
-
             if (Context.Message.Mentions.Length == 1 && boundUser == null)
             {
                 await Context.Channel.SendMessageAsync("Mentioned user is not binded.");
                 return;
+            }
+
+            if (boundUser != null) userName = boundUser.UserName;
+            else if(string.IsNullOrEmpty(userName))
+            {
+                await Context.Channel.SendMessageAsync(
+                    "You don't exist in the database yet." +
+                    "Do `$osubind [username]` to continue the use of `$osu` without parameters.");
             }
 
             SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
@@ -73,16 +81,7 @@ namespace MrServer.Bot.Commands.Nodes
                 {
                     for (int i = 0; i < userGameModes.Length; i++)
                     {
-                        string emoji = string.Empty;
-
-                        switch (userGameModes[i])
-                        {
-                            case OsuGameModes.STD: emoji = "<:STD:415867031087480833>"; break;
-                            case OsuGameModes.Taiko: emoji = "<:Taiko:415867092311605252>"; break;
-                            case OsuGameModes.CtB: emoji = "<:CtB:415867131851309056>"; break;
-                            case OsuGameModes.Mania: emoji = "<:Mania:415867163279228938>"; break;
-                        }
-
+                        string emoji = OsuGameModesConverter.ToEmoji(userGameModes[i]);
 
                         eb.AddField(x =>
                         {
@@ -232,25 +231,31 @@ namespace MrServer.Bot.Commands.Nodes
         }
 
         [Command("Beatmap")]
-        [RequireOwner]
         [Hidden]
-        public async Task GetBeatmap(string ID, string action = null)
+        public async Task GetBeatmap(string ID, string mode = null, string action = null)
         {
             SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
 
-            OsuBeatmap beatmap = await OsuNetwork.DownloadOsuBeatmap(int.Parse(ID), false);
+            int modeInt = (string.IsNullOrEmpty(mode) ? -1 : int.Parse(mode));
+
+            OsuBeatmap beatmap = await OsuNetwork.DownloadOsuBeatmap(int.Parse(ID), false, modeInt);
+
+            OsuGameModes gameMode = modeInt == -1 ? beatmap.GameMode : OsuGameModesConverter.FromOfficialNumeration((byte)modeInt);
 
             OsuUser creator = await OsuNetwork.DownloadOsuUser(beatmap.Creator, maxAttempts: 3);
-            Task<OsuScore[]> bestPlayDownloader = OsuNetwork.DownloadOsuBeatmapScores(beatmap, 3);
+            Task<OsuScore[]> bestPlayDownloader = OsuNetwork.DownloadOsuBeatmapScores(beatmap, OsuGameModesConverter.ToOfficialNumeration(gameMode), 3, 2);
+
+            OsuBoundUserDB bound = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID);
+            Task<OsuScore> boundBestScoreDownloader = OsuNetwork.DownloadOsuBeatmapBest(beatmap, gameMode, bound.UserID, 3);
 
             EmbedBuilder eb = new EmbedBuilder();
 
             eb.Thumbnail = $"https://b.ppy.sh/thumb/{beatmap.BeatmapSetID}l.jpg";
             eb.Author = new EmbedAuthorBuilder()
             {
-                IconUrl = GetDifficultyIconURL(beatmap.Difficulty.Rating, beatmap.GameMode),
+                IconUrl = GetDifficultyIconURL(beatmap.Difficulty.Rating, gameMode),
                 Name = $"{beatmap.Title} ({beatmap.Version})",
-                Url = $"https://osu.ppy.sh/b/{beatmap.BeatmapID}&m={(byte)beatmap.GameMode}"
+                Url = $"https://osu.ppy.sh/b/{beatmap.BeatmapID}&m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}"
             };
 
             eb.Color = Color.FromArgb(28, 164, 185);
@@ -272,8 +277,8 @@ namespace MrServer.Bot.Commands.Nodes
             {
                 x.Name = $"{beatmap.FavouriteCount} ❤️";
                 x.Value =
-                $"• Plays: **{beatmap.PlayCount}**\n" +
-                $"• Passes: **{beatmap.PassCount}**";
+                $"• Plays: {beatmap.PlayCount.ToString("#,#", CultureInfo.InvariantCulture)}\n" +
+                $"• Passes: {beatmap.PassCount.ToString("#,#", CultureInfo.InvariantCulture)}";
 
                 x.IsInline = true;
             });
@@ -282,18 +287,18 @@ namespace MrServer.Bot.Commands.Nodes
 
             await msg.EditAsync("Fetching best plays...", null);
 
-            if (bestPlays != null)
+            if (bestPlays.Length > 0)
             {
                 EmbedFieldBuilder rankingsField = new EmbedFieldBuilder();
 
-                rankingsField.Name = "🏆";
+                rankingsField.Name = $"{OsuGameModesConverter.ToEmoji(gameMode)}";
                 rankingsField.Value = "report to LtLi0n";
 
                 for (int i = 0; i < bestPlays.Length; i++)
                 {
                     OsuUser bestPlayUser = await OsuNetwork.DownloadOsuUser(bestPlays[i].Username);
 
-                    string toAdd = $"`#{i + 1}` :flag_{bestPlayUser.Country.ToLower()}: {bestPlays[i].Username} • Score: **{bestPlays[i].Score.ToString("#,#", CultureInfo.InvariantCulture)}**\n";
+                    string toAdd = ToScoreString(bestPlays[i], bestPlayUser.Country, gameMode, i + 1);
 
                     if (i == 0) rankingsField.Value = toAdd;
                     else rankingsField.Value += toAdd;
@@ -302,11 +307,38 @@ namespace MrServer.Bot.Commands.Nodes
                 rankingsField.IsInline = true;
 
                 eb.AddField(rankingsField);
+
+                if(bound != null)
+                {
+                    OsuScore boundBestScore = await boundBestScoreDownloader;
+
+                    if(boundBestScore != null)
+                    {
+                        eb.AddField(x => 
+                        {
+                            x.Name = $"Your best";
+                            x.Value = ToScoreString(boundBestScore, bound.Country, gameMode);
+                            x.IsInline = true;
+                        });
+                    }
+                }
+            }
+            else
+            {
+                string[] lines_f1 = eb.Fields[0].Value.ToString().Split('\n');
+                lines_f1[0] += "\t\t\u200b";
+
+                string convertBack = "";
+                Tool.ForEach(lines_f1, x => convertBack += (x + '\n'));
+
+                eb.Fields[0].Value = convertBack;
+
+                eb.Fields[1].Value = '\u200b';
             }
 
             eb.Footer = new EmbedFooterBuilder()
             {
-                Text = $"Ranked: {beatmap.ApprovalDate.ToShortDateString()} • Last Update: {beatmap.LastUpdate.ToShortDateString()}",
+                Text = $"{Enum.GetName(typeof(OsuApproval), beatmap.Approval)}{string.Format("{0}", beatmap.ApprovalDate != default(DateTime) ? $": {beatmap.ApprovalDate.ToShortDateString()}" : string.Empty)} • Last Update: {beatmap.LastUpdate.ToShortDateString()}",
                 IconUrl = creator != null ? creator.AvatarURL : string.Empty
             };
 
@@ -324,7 +356,9 @@ namespace MrServer.Bot.Commands.Nodes
             
         }
 
-        private string GetDifficultyIconURL(float rating, OsuGameModes gameMode)
+        private static string ToScoreString(OsuScore score, string flag, OsuGameModes gameMode, int? rank = null) => $"{string.Format("{0}", rank.HasValue ? $"**`#{rank}`** " : string.Empty)}:flag_{flag.ToLower()}: **`{score.Username}`** • Score: {score.Score.ToString("#,#", CultureInfo.InvariantCulture)} • {string.Format("{0:0.##}", score.GetAccuracy(gameMode) * 100)}%\n";
+
+        private static string GetDifficultyIconURL(float rating, OsuGameModes gameMode)
         {
             string diffIcon = string.Empty;
 

@@ -10,10 +10,10 @@ namespace MrServer.Bot.Commands
         Required,
         /// <summary> Catches a single optional parameter. </summary>
         Optional,
-        /// <summary> Catches a zero or more optional parameters. </summary>
-        Multiple,
+        /// <summary> Catches an unparsed required parameter. </summary>
+        UnparsedRequired,
         /// <summary> Catches all remaining text as a single optional parameter. </summary>
-        Unparsed
+        UnparsedOptional
     }
 
     public class CommandParameter

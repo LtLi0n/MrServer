@@ -15,6 +15,7 @@ using MrServerPackets.Discord.Models.Guilds;
 using MrServer.Bot.Models;
 using MrServer.Bot.Client;
 using System.Net.Http;
+using MrServerPackets.ApiStructures.Osu;
 
 namespace MrServer.Network
 {

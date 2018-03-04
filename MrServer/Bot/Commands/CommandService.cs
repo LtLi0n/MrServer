@@ -39,7 +39,7 @@ namespace MrServer.Bot.Commands
         public DiscordCommand Command(string cmd) => commands.Where(x => x.CMD == cmd).First();
 
         //Try to find the command and execute it
-        public Task<bool> ExecuteAsync(string cmd, string input, SocketUserMessage Message, bool IgnoreCase = true)
+        public Task<bool> ExecuteAsync(string cmd, string input, SocketUserMessage Message, bool IgnoreCase = true, bool internally = false)
         {
             bool success = false;
 
@@ -54,7 +54,7 @@ namespace MrServer.Bot.Commands
                             parameters: c.Parameters,
                             message: Message,
                             cService: this,
-                            network: Discord.network));
+                            network: Discord.network), internally);
 
                         success = true;
                         return;
@@ -105,7 +105,7 @@ namespace MrServer.Bot.Commands
 
                                 remainderUsed = true;
 
-                                type = ParameterType.Unparsed;
+                                type = type == ParameterType.Optional ? ParameterType.UnparsedOptional : ParameterType.UnparsedRequired;
                             }
 
                             cb.AddParameter(parameters[i].Name, type);

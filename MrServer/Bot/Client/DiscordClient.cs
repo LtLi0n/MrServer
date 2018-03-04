@@ -13,6 +13,7 @@ using MrServerPackets.Headers;
 using MrServerPackets.Discord.Models.Guilds;
 using MrServer.Bot.Models;
 using System.Linq;
+using MrServer.Network.Osu;
 
 namespace MrServer.Bot.Client
 {
@@ -32,7 +33,9 @@ namespace MrServer.Bot.Client
         private bool waitingForBotMessage => waitingForBotMessages > 0;
         private int waitingForBotMessages = 0;
 
-        public DiscordClient(NetworkHandler NetworkHandler)
+        private OsuNetwork osu;
+
+        public DiscordClient(NetworkHandler network)
         {
             TrackedMessages = new List<SocketUserMessage>();
 
@@ -40,9 +43,11 @@ namespace MrServer.Bot.Client
             cService = new CommandService(this);
             //cService.WaitUntilLoaded().GetAwaiter().GetResult();
 
-            network = NetworkHandler;
+            this.network = network;
 
-            NetworkHandler.DiscordMessageReceived += NetworkHandler_DiscordMessageReceived;
+            network.DiscordMessageReceived += NetworkHandler_DiscordMessageReceived;
+
+            osu = new OsuNetwork(this);
         }
 
         public async Task<SocketUserMessage> GetBotMessageAsync(string expectedID)
@@ -75,8 +80,6 @@ namespace MrServer.Bot.Client
 
         private async void NetworkHandler_DiscordMessageReceived(object sender, DiscordMessageReceivedEventArgs e)
         {
-            SocketUserMessage userMsg = e.Message as SocketUserMessage;
-
             if (!string.IsNullOrEmpty(e.Message.UniqueID)) TrackedMessages.Add(e.Message);
 
             if (e.Message.Author.IsBot) return;
@@ -97,7 +100,7 @@ namespace MrServer.Bot.Client
 
                     try
                     {
-                        bool success = await cService.ExecuteAsync(e.Message.Content.Split(' ')[0].Remove(0, PREFIX.Length), input, userMsg);
+                        bool success = await cService.ExecuteAsync(e.Message.Content.Split(' ')[0].Remove(0, PREFIX.Length), input, e.Message);
                     }
                     catch (Exception ee)
                     {
