@@ -46,49 +46,60 @@ namespace MrServer.Network.Osu
 
         private const string api = "https://osu.ppy.sh/api/";
 
-        public static async Task<OsuUser> DownloadOsuUser(string userName, byte gameMode = 0, int maxAttempts = 1) => 
-            await DownloadOsuUserMain(userName, gameMode, maxAttempts);
+        public static async Task<OsuUser> DownloadUser(string userName, byte gameMode = 0, int maxAttempts = 1) => 
+            await DownloadUserMain(userName, gameMode, maxAttempts);
 
-        public static async Task<OsuUser> DownloadOsuUser(ulong userID, byte gameMode = 0, int maxAttempts = 1) => 
-            await DownloadOsuUserMain(userID, gameMode, maxAttempts);
+        public static async Task<OsuUser> DownloadUser(ulong userID, byte gameMode = 0, int maxAttempts = 1) => 
+            await DownloadUserMain(userID, gameMode, maxAttempts);
+
+        public static async Task<OsuUserRecent> DownloadUserRecent(ulong userID, OsuGameModes gameMode, int maxAttempts = 1) =>
+            await DownloadObject<OsuUserRecent>(
+                $"{api}get_user_recent?" +
+                $"k={Keys.API_KEYS["Osu"]}&" +
+                $"m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}&" +
+                $"u={userID}&" +
+                $"type=id&" +
+                $"limit=1", maxAttempts, gameMode);
 
         ///<summary>Download x amount of top scores for a specified beatmap. Limit range 1 - 100.</summary>
-        public static async Task<OsuScore[]> DownloadOsuBeatmapScores(OsuBeatmap beatmap, int gameMode, int scoreCount, int maxAttempts = 1) =>
+        public static async Task<OsuScore[]> DownloadOsuBeatmapScores(OsuBeatmap beatmap, OsuGameModes gameMode, int scoreCount, int maxAttempts = 1) =>
             await OsuScore.CreateScores(NetworkHandler.DownloadJSON(
                 $"{api}get_scores?" +
                 $"k={Keys.API_KEYS["Osu"]}&" +
                 $"b={beatmap.BeatmapID}&" +
                 $"limit={scoreCount}&" +
-                $"&m={gameMode}", maxAttempts).GetAwaiter().GetResult());
+                $"m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}", maxAttempts).GetAwaiter().GetResult(), gameMode);
 
         ///<summary>Download the best play for a specified beatmap.</summary>
-        public static async Task<OsuScore> DownloadOsuBeatmapBest(OsuBeatmap beatmap, OsuGameModes gameMode, ulong? user, int maxAttempts = 1) =>
-            await DownloadOsuObject<OsuScore>(
+        public static Task<OsuScore> DownloadBeatmapBest(OsuBeatmap beatmap, OsuGameModes gameMode, ulong? user, int maxAttempts = 1) =>
+            Task.FromResult(OsuScore.CreateOsuScore(NetworkHandler.DownloadJSON(
                 $"{api}get_scores?" +
                 $"k={Keys.API_KEYS["Osu"]}&" +
                 $"b={beatmap.BeatmapID}&" +
                 $"limit=1&" +
                 $"&m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}" +
-                string.Format("{0}", user.HasValue ? $"&u={user.Value}" : string.Empty), maxAttempts);
+                string.Format("{0}", user.HasValue ? $"&u={user.Value}" : string.Empty), maxAttempts).GetAwaiter().GetResult(), gameMode));
 
-        public static async Task<OsuBeatmap> DownloadOsuBeatmap(int ID, bool group, int gameMode = -1, int maxAttempts = 2) =>
-            await DownloadOsuObject<OsuBeatmap>(
+        public static async Task<OsuBeatmap> DownloadBeatmap(int ID, bool group, int gameMode = -1, int maxAttempts = 2) =>
+            await DownloadObject<OsuBeatmap>(
                 $"{api}get_beatmaps?" +
                 $"k={Keys.API_KEYS["Osu"]}&" +
                 $"{string.Format("{0}", group ? "s" : "b")}={ID}" +
                 string.Format("{0}", gameMode != -1 ? $"&a=1&m={gameMode}" : string.Empty), maxAttempts);
 
-        private static async Task<OsuUser> DownloadOsuUserMain(object user, byte gameMode, int maxAttempts) =>
-            await DownloadOsuObject<OsuUser>(
+        private static async Task<OsuUser> DownloadUserMain(object user, byte gameMode, int maxAttempts) =>
+            await DownloadObject<OsuUser>(
                 $"{api}get_user?" +
                 $"k={Keys.API_KEYS["Osu"]}&" +
                 $"u={user}&m={gameMode}", maxAttempts, gameMode);
 
-        private static async Task<T> DownloadOsuObject<T>(string url, int maxAttempts, object additional = null)
+        private static async Task<T> DownloadObject<T>(string url, int maxAttempts, object additional = null)
         {
             string json = await NetworkHandler.DownloadJSON(url, maxAttempts);
 
-            return (T)(additional != null ? Activator.CreateInstance(typeof(T), json, additional) : Activator.CreateInstance(typeof(T), json));
+            try { return (T)(additional != null ? Activator.CreateInstance(typeof(T), json, additional) : Activator.CreateInstance(typeof(T), json)); }
+            catch { return default(T); }
+            
         }
     }
 }

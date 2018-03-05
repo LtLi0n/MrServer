@@ -14,7 +14,7 @@ using System.Drawing;
 namespace MrServer.Bot.Commands.Nodes
 {
     [CommandNode("System")]
-    [RequireRole(417325871838265356)]
+    //[RequireRole(417325871838265356)]
     public class SystemNode : ICommandNode
     {
         [Command("test")]

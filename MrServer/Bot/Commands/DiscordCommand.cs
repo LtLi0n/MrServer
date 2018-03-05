@@ -43,7 +43,7 @@ namespace MrServer.Bot.Commands
 
         public async Task RunAsync(CommandEventArgs e, bool internally = false)
         {
-            if (e.Channel.ID != 409677778405818368 && e.Channel.ID != 417690504512274452)
+            if (e.Channel.ID != 409677778405818368 && e.Channel.ID != 417690504512274452 && e.Channel.ID != 420253228689653781)
             {
                 if(!internally) await e.Channel.SendMessageAsync("Commands don't work in unaccepted channels.");
                 return;

@@ -24,7 +24,7 @@ namespace MrServer.Bot.Models
         public Guild CommunicationGuild => new Guild()
         {
             DefaultChannelID = base.DefaultChannelID,
-            ID = base.DefaultChannelID,
+            ID = base.ID,
             Name = base.Name,
             Owner = base.Owner
         };

@@ -1,28 +1,34 @@
-﻿using MrServer.SQL.Osu;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Linq;
-using System.Threading.Tasks;
-using MrServer.Bot.Commands.Permissions;
-using MrServerPackets.Discord.Models.Guilds;
-using MrServerPackets.ApiStructures.Osu.Database;
-using MrServerPackets.ApiStructures.Osu;
-using MrServerPackets.Discord.Entities;
-using System.Globalization;
+using System.Collections.Specialized;
 using System.Drawing;
-using MrServer.Bot.Client;
-using System.Threading;
-using MrServer.Bot.Commands.Attributes;
+using System.Globalization;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
+using MrServerPackets.ApiStructures.Osu;
+using MrServerPackets.ApiStructures.Osu.Database;
+using MrServerPackets.Discord.Entities;
+using MrServerPackets.Discord.Models;
+using MrServerPackets.Discord.Models.Guilds;
+
+using MrServer.SQL.Osu;
+using MrServer.Bot.Commands.Permissions;
+using MrServer.Bot.Client;
+using MrServer.Bot.Commands.Attributes;
 using MrServer.Bot.Commands.Attributes.Permissions;
 using MrServer.Bot.Models;
 using MrServer.Network.Osu;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using MrServerPackets.Discord.Models;
-using System.Linq;
 using MrServer.Additionals.Tools;
+using MrServer.Network;
 
 namespace MrServer.Bot.Commands.Nodes
 {
@@ -50,7 +56,7 @@ namespace MrServer.Bot.Commands.Nodes
             }
 
             if (boundUser != null) userName = boundUser.UserName;
-            else if(string.IsNullOrEmpty(userName))
+            else if (string.IsNullOrEmpty(userName))
             {
                 await Context.Channel.SendMessageAsync(
                     "You don't exist in the database yet." +
@@ -59,7 +65,7 @@ namespace MrServer.Bot.Commands.Nodes
 
             SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
 
-            OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userName, maxAttempts: 2);
+            OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userName, maxAttempts: 2);
 
             EmbedBuilder eb = new EmbedBuilder();
 
@@ -171,7 +177,7 @@ namespace MrServer.Bot.Commands.Nodes
 
                 if (!boundUser.GameModes.HasFlag(gameMode))
                 {
-                    OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(boundUser.UserID, OsuGameModesConverter.ToOfficialNumeration(gameMode));
+                    OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(boundUser.UserID, OsuGameModesConverter.ToOfficialNumeration(gameMode));
 
                     await OsuDB.WriteOsuGameModeUser(osuUser, gameMode);
 
@@ -190,7 +196,7 @@ namespace MrServer.Bot.Commands.Nodes
         [Command("OsuBind")]
         public async Task OsuBindUser([Remainder]string userName)
         {
-            OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userName);
+            OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userName);
 
             OsuBoundUserDB BoundUser = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID);
 
@@ -230,6 +236,61 @@ namespace MrServer.Bot.Commands.Nodes
             }
         }
 
+        [Command("Recent")]
+        public async Task GetRecent([Remainder]string target = null)
+        {
+            SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
+
+            ulong? targetID = null;
+
+            string username = string.Empty;
+            string country = string.Empty;
+
+            if (string.IsNullOrEmpty(target))
+            {
+                OsuBoundUserDB bound = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID);
+
+                if (bound != null)
+                {
+                    targetID = bound.UserID;
+                    country = bound.Country;
+                    username = bound.UserName;
+                }
+
+                //Add "You are not bound"
+            }
+            else
+            {
+                if (target.Where(x => x < '0' || x > '9').Count() > 0)
+                {
+                    //Not ID
+                }
+                else targetID = ulong.Parse(target);
+            }
+
+            OsuUserRecent recent = await OsuNetwork.DownloadUserRecent(targetID.Value, OsuGameModes.STD);
+
+            if(recent == null)
+            {
+                await msg.EditAsync("No recent plays have been found. 🔎", null);
+                return;
+            }
+
+            OsuBeatmap beatmap = await OsuNetwork.DownloadBeatmap(recent.BeatmapID, false, 0);
+
+            OsuUser beatmapCreator = await OsuNetwork.DownloadUser(beatmap.Creator);
+
+            EmbedBuilder eb = beatmap.ToEmbedBuilder(OsuGameModes.STD, beatmapCreator, true);
+
+            eb.Fields.Insert(0, new EmbedFieldBuilder
+            {
+                Name = $"Recent {OsuGameModesConverter.ToEmoji(OsuGameModes.STD)}",
+                Value = ToScoreString(recent, country, OsuGameModes.STD, username, nameFormat: '\u200b')
+            });
+
+            await msg.EditAsync("", eb.Build());
+        }
+
         [Command("Beatmap")]
         [Hidden]
         public async Task GetBeatmap(string ID, string mode = null, string action = null)
@@ -238,50 +299,17 @@ namespace MrServer.Bot.Commands.Nodes
 
             int modeInt = (string.IsNullOrEmpty(mode) ? -1 : int.Parse(mode));
 
-            OsuBeatmap beatmap = await OsuNetwork.DownloadOsuBeatmap(int.Parse(ID), false, modeInt);
+            OsuBeatmap beatmap = await OsuNetwork.DownloadBeatmap(int.Parse(ID), false, modeInt);
 
             OsuGameModes gameMode = modeInt == -1 ? beatmap.GameMode : OsuGameModesConverter.FromOfficialNumeration((byte)modeInt);
 
-            OsuUser creator = await OsuNetwork.DownloadOsuUser(beatmap.Creator, maxAttempts: 3);
-            Task<OsuScore[]> bestPlayDownloader = OsuNetwork.DownloadOsuBeatmapScores(beatmap, OsuGameModesConverter.ToOfficialNumeration(gameMode), 3, 2);
+            OsuUser creator = await OsuNetwork.DownloadUser(beatmap.Creator, maxAttempts: 3);
+            Task<OsuScore[]> bestPlayDownloader = OsuNetwork.DownloadOsuBeatmapScores(beatmap, gameMode, 3, 2);
 
             OsuBoundUserDB bound = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID);
-            Task<OsuScore> boundBestScoreDownloader = OsuNetwork.DownloadOsuBeatmapBest(beatmap, gameMode, bound.UserID, 3);
+            Task<OsuScore> boundBestScoreDownloader = OsuNetwork.DownloadBeatmapBest(beatmap, gameMode, bound.UserID, 3);
 
-            EmbedBuilder eb = new EmbedBuilder();
-
-            eb.Thumbnail = $"https://b.ppy.sh/thumb/{beatmap.BeatmapSetID}l.jpg";
-            eb.Author = new EmbedAuthorBuilder()
-            {
-                IconUrl = GetDifficultyIconURL(beatmap.Difficulty.Rating, gameMode),
-                Name = $"{beatmap.Title} ({beatmap.Version})",
-                Url = $"https://osu.ppy.sh/b/{beatmap.BeatmapID}&m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}"
-            };
-
-            eb.Color = Color.FromArgb(28, 164, 185);
-
-            eb.Description = 
-                $"Created by: **[{creator.Username}](https://osu.ppy.sh/u/{creator.UserID})**\n" +
-                $"📥 **[Download](https://osu.ppy.sh/d/{beatmap.BeatmapSetID}n)** 🖼 [With Video](https://osu.ppy.sh/d/{beatmap.BeatmapSetID})";
-
-            eb.AddField(x =>
-            {
-                x.Name = $"{string.Format("{0:0.##}", beatmap.Difficulty.Rating)} ⭐ {beatmap.Length} ⏱";
-                x.Value =
-                $"AR: **{beatmap.Difficulty.Approach}** • CS: **{beatmap.Difficulty.Size}** • OD: **{beatmap.Difficulty.Overall}** • Drain: **{beatmap.Difficulty.Drain}**\n" +
-                $"BPM: **{beatmap.BPM}**";
-                x.IsInline = true;
-            });
-
-            eb.AddField(x =>
-            {
-                x.Name = $"{beatmap.FavouriteCount} ❤️";
-                x.Value =
-                $"• Plays: {beatmap.PlayCount.ToString("#,#", CultureInfo.InvariantCulture)}\n" +
-                $"• Passes: {beatmap.PassCount.ToString("#,#", CultureInfo.InvariantCulture)}";
-
-                x.IsInline = true;
-            });
+            EmbedBuilder eb = beatmap.ToEmbedBuilder(gameMode, creator);
 
             OsuScore[] bestPlays = await bestPlayDownloader;
 
@@ -294,33 +322,50 @@ namespace MrServer.Bot.Commands.Nodes
                 rankingsField.Name = $"{OsuGameModesConverter.ToEmoji(gameMode)}";
                 rankingsField.Value = "report to LtLi0n";
 
+                OsuUser[] bestPlayUsers = new OsuUser[bestPlays.Length];
+
+                int longestName = int.MinValue;
+
                 for (int i = 0; i < bestPlays.Length; i++)
                 {
-                    OsuUser bestPlayUser = await OsuNetwork.DownloadOsuUser(bestPlays[i].Username);
+                    bestPlayUsers[i] = await OsuNetwork.DownloadUser(bestPlays[i].Username);
 
-                    string toAdd = ToScoreString(bestPlays[i], bestPlayUser.Country, gameMode, i + 1);
+                    if (bestPlayUsers[i].Username.Length > longestName) longestName = bestPlayUsers[i].Username.Length;
+                }
+
+                for (int i = 0; i < bestPlayUsers.Length; i++)
+                {
+                    string toAdd = ToScoreString(bestPlays[i], bestPlayUsers[i].Country, gameMode, i + 1, longestName);
 
                     if (i == 0) rankingsField.Value = toAdd;
                     else rankingsField.Value += toAdd;
                 }
 
+                //delete after
+                string testF = string.Format("{0}", longestName != 0 ? bestPlays[0].Username + new string(new char[longestName - bestPlays[0].Username.Length].Select(X => X = ' ').ToArray()) : bestPlays[0].Username);
+
                 rankingsField.IsInline = true;
 
                 eb.AddField(rankingsField);
 
-                if(bound != null)
+                if (bound != null)
                 {
-                    OsuScore boundBestScore = await boundBestScoreDownloader;
-
-                    if(boundBestScore != null)
+                    try
                     {
-                        eb.AddField(x => 
+                        OsuScore boundBestScore = await boundBestScoreDownloader;
+
+                        if (boundBestScore != null)
                         {
-                            x.Name = $"Your best";
-                            x.Value = ToScoreString(boundBestScore, bound.Country, gameMode);
-                            x.IsInline = true;
-                        });
+                            eb.AddField(x =>
+                            {
+                                x.Name = $"Your best";
+                                x.Value = ToScoreString(boundBestScore, bound.Country, gameMode, nameFormat: '\u200b');
+                                x.IsInline = true;
+                            });
+                        }
                     }
+                    catch (Exception e) { }
+
                 }
             }
             else
@@ -336,47 +381,18 @@ namespace MrServer.Bot.Commands.Nodes
                 eb.Fields[1].Value = '\u200b';
             }
 
-            eb.Footer = new EmbedFooterBuilder()
-            {
-                Text = $"{Enum.GetName(typeof(OsuApproval), beatmap.Approval)}{string.Format("{0}", beatmap.ApprovalDate != default(DateTime) ? $": {beatmap.ApprovalDate.ToShortDateString()}" : string.Empty)} • Last Update: {beatmap.LastUpdate.ToShortDateString()}",
-                IconUrl = creator != null ? creator.AvatarURL : string.Empty
-            };
-
             string additional = string.Empty;
 
             if (action != null) additional = action.ToLower() == "json" ? $"```json\n{JValue.Parse(JsonConvert.SerializeObject(beatmap)).ToString(Formatting.Indented)}```" : string.Empty;
 
-            try
-            {
-                Embed embed = eb.Build();
-
-                await msg.EditAsync((additional), embed: embed);
-            }
-            catch(Exception e) { Console.WriteLine(e); }
-            
+            await msg.EditAsync((additional), embed: eb.Build());
         }
 
-        private static string ToScoreString(OsuScore score, string flag, OsuGameModes gameMode, int? rank = null) => $"{string.Format("{0}", rank.HasValue ? $"**`#{rank}`** " : string.Empty)}:flag_{flag.ToLower()}: **`{score.Username}`** • Score: {score.Score.ToString("#,#", CultureInfo.InvariantCulture)} • {string.Format("{0:0.##}", score.GetAccuracy(gameMode) * 100)}%\n";
+        private static string ToScoreString(OsuScore score, string flag, OsuGameModes gameMode, int? rank = null, int? maxLength = null, char nameFormat = '`') =>
+            $"{string.Format("{0}", rank.HasValue ? $"**`#{rank}`** " : string.Empty)}:flag_{flag.ToLower()}: **{nameFormat}{string.Format("{0}", maxLength.HasValue ? score.Username + new string(new char[maxLength.Value - score.Username.Length].Select(c => c = ' ').Append('\u200b').ToArray()) : score.Username)}{nameFormat}**: {score.Score.ToString("#,#", CultureInfo.InvariantCulture)} • **{string.Format("{0:0.##}", score.Accuracy * 100)}%** • {score.ScoreHits.MaxCombo}x • {CustomEmoji.Osu.Rank.FromRank(score.Rank)}{string.Format("{0}", score.Mods.ToLongName() != "NoMod" ? $" • **{score.Mods.ToLongName()}**" : string.Empty)}\n";
 
-        private static string GetDifficultyIconURL(float rating, OsuGameModes gameMode)
-        {
-            string diffIcon = string.Empty;
+        private static string ToScoreString(OsuUserRecent score, string flag, OsuGameModes gameMode, string username, int? rank = null, int? maxLength = null, char nameFormat = '`') =>
+            $"{string.Format("{0}", rank.HasValue ? $"**`#{rank}`** " : string.Empty)}:flag_{flag.ToLower()}: **{nameFormat}{string.Format("{0}", maxLength.HasValue ? username + new string(new char[maxLength.Value - username.Length].Select(c => c = ' ').Append('\u200b').ToArray()) : username)}{nameFormat}**: {score.Score.ToString("#,#", CultureInfo.InvariantCulture)} • **{string.Format("{0:0.##}", score.Acccuracy * 100)}%** • {score.ScoreHits.MaxCombo}x • {CustomEmoji.Osu.Rank.FromRank(score.Rank)}{string.Format("{0}", score.Mods.ToLongName() != "NoMod" ? $" • **{score.Mods.ToLongName()}**" : string.Empty)}\n";
 
-            if (rating < 1.50) diffIcon = "easy";
-            else if (rating < 2.25) diffIcon = "normal";
-            else if (rating < 3.75) diffIcon = "hard";
-            else if (rating < 5.25) diffIcon = "insane";
-            else if (rating < 6.75) diffIcon = "expert";
-            else diffIcon = "expert";
-
-            switch (gameMode)
-            {
-                case OsuGameModes.Taiko: diffIcon += "-t"; break;
-                case OsuGameModes.CtB: diffIcon += "-f"; break;
-                case OsuGameModes.Mania: diffIcon += "-m"; break;
-            }
-
-            return $"https://s.ppy.sh/images/{diffIcon}.png";
-        }
     }
 }

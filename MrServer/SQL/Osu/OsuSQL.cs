@@ -77,25 +77,25 @@ namespace MrServer.SQL.Osu
 
             foreach (ulong userID in users_std_ID)
             {
-                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userID, 0, 3);
+                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, 0, 3);
                 if(osuUser != null) await WriteOsuGameModeUser(osuUser, OsuGameModes.STD);
             }
 
             foreach (ulong userID in users_taiko_ID)
             {
-                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userID, 1, 3);
+                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, 1, 3);
                 if (osuUser != null) await WriteOsuGameModeUser(osuUser, OsuGameModes.Taiko);
             }
 
             foreach (ulong userID in users_ctb_ID)
             {
-                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userID, 2, 3);
+                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, 2, 3);
                 if (osuUser != null) await WriteOsuGameModeUser(osuUser, OsuGameModes.CtB);
             }
 
             foreach (ulong userID in users_std_ID)
             {
-                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadOsuUser(userID, 3, 3);
+                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, 3, 3);
                 if (osuUser != null) await WriteOsuGameModeUser(osuUser, OsuGameModes.Mania);
             }
 
