@@ -77,25 +77,25 @@ namespace MrServer.SQL.Osu
 
             foreach (ulong userID in users_std_ID)
             {
-                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, 0, 3);
+                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, OsuGameModes.STD, maxAttempts: 3);
                 if(osuUser != null) await WriteOsuGameModeUser(osuUser, OsuGameModes.STD);
             }
 
             foreach (ulong userID in users_taiko_ID)
             {
-                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, 1, 3);
+                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, OsuGameModes.Taiko, maxAttempts: 3);
                 if (osuUser != null) await WriteOsuGameModeUser(osuUser, OsuGameModes.Taiko);
             }
 
             foreach (ulong userID in users_ctb_ID)
             {
-                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, 2, 3);
+                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, OsuGameModes.CtB, maxAttempts: 3);
                 if (osuUser != null) await WriteOsuGameModeUser(osuUser, OsuGameModes.CtB);
             }
 
             foreach (ulong userID in users_std_ID)
             {
-                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, 3, 3);
+                OsuUser osuUser = await Network.Osu.OsuNetwork.DownloadUser(userID, OsuGameModes.Mania, maxAttempts: 3);
                 if (osuUser != null) await WriteOsuGameModeUser(osuUser, OsuGameModes.Mania);
             }
 
@@ -268,8 +268,8 @@ namespace MrServer.SQL.Osu
         public async Task RegisterBoundOsuUser(OsuUser OsuUser, ulong DiscordID) =>
             await new SQLiteCommand(
                 $"INSERT INTO {table_name} " +
-                $"(DiscordID, UserID, UserName, GameModes, Country) " +
-                $"VALUES ('{DiscordID}', '{OsuUser.UserID}', '{OsuUser.Username}', '{(byte)OsuGameModes.None}', '{OsuUser.Country}')",
+                $"(DiscordID, UserID, UserName, GameModes, Country, MainMode) " +
+                $"VALUES ('{DiscordID}', '{OsuUser.UserID}', '{OsuUser.Username}', '{(byte)OsuGameModes.None}', '{OsuUser.Country}', '0')",
                 db_Connection).ExecuteNonQueryAsync();
 
         public async Task UpdateBoundOsuUser(OsuUser osuUser, OsuBoundUserDB boundUser) =>
@@ -278,7 +278,8 @@ namespace MrServer.SQL.Osu
                 $"SET " +
                 $"UserName = '{osuUser.Username}'," +
                 $"GameModes = '{(byte)boundUser.GameModes}'," +
-                $"Country = '{osuUser.Country}' " +
+                $"Country = '{osuUser.Country}," +
+                $"MainMode = '{(byte)boundUser.MainMode}' " +
                 $"WHERE UserID = '{boundUser.UserID}'",
                 db_Connection).ExecuteNonQueryAsync();
 
@@ -286,7 +287,8 @@ namespace MrServer.SQL.Osu
             await new SQLiteCommand(
                 $"UPDATE {table_name} " +
                 $"SET " +
-                $"GameModes = '{(byte)boundUser.GameModes}' " +
+                $"GameModes = '{(byte)boundUser.GameModes}'," +
+                $"MainMode = '{(byte)boundUser.MainMode}' " +
                 $"WHERE UserID = '{boundUser.UserID}'",
                 db_Connection).ExecuteNonQueryAsync();
 
@@ -308,7 +310,8 @@ namespace MrServer.SQL.Osu
                     UserID = ulong.Parse(reader["UserID"].ToString()),
                     UserName = reader["UserName"].ToString(),
                     GameModes = (OsuGameModes)byte.Parse(reader["GameModes"].ToString()),
-                    Country = reader["Country"].ToString()
+                    Country = reader["Country"].ToString(),
+                    MainMode = (OsuGameModes)byte.Parse(reader["MainMode"].ToString())
                 };
             }
             else return null;

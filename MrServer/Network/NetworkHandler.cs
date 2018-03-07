@@ -110,7 +110,10 @@ namespace MrServer.Network
             DiscordTCP = client;
 
             client.NoDelay = true;
-            Console.WriteLine($"{client.Client.RemoteEndPoint.ToString()} Connected!");
+
+            EndPoint clientLocation = client.Client.RemoteEndPoint;
+
+            Console.WriteLine($"{clientLocation} Connected!");
 
             try
             {
@@ -120,7 +123,7 @@ namespace MrServer.Network
 
                     while (client.Available < 8)
                     {
-                        if (!client.Connected)
+                        if (!client.Client.IsConnected())
                         {
                             disconnected = true;
                             break;
@@ -180,22 +183,17 @@ namespace MrServer.Network
                         }
                     }
                 }
-
-                Console.WriteLine("Client disconnected");
             }
 
             catch (Exception e)
             {
-                if (e.GetType() != typeof(SocketException))
-                {
-                    Console.WriteLine(e.Message);
-                }
+                if (e.GetType() != typeof(SocketException)) Console.WriteLine(e.Message);
             }
 
-            if (client.Client.Connected)
-            {
-                client.Close();
-            }
+            if (client.Client.Connected) client.Close();
+
+            Console.WriteLine($"{clientLocation} Disconnected.");
+            return;
         }
 
         public Task Send<T>(byte[] data, TcpClient client)
@@ -227,11 +225,12 @@ namespace MrServer.Network
                 {
                     try
                     {
-                        string json = await htppClient.GetStringAsync(url);
-
-                        return json;
+                        return await htppClient.GetStringAsync(url);
                     }
-                    catch (Exception e) { Console.WriteLine(e.Message); }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e.Message);
+                    }
                 }
             }
 
