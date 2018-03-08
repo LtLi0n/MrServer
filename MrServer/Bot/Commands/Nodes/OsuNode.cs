@@ -317,7 +317,6 @@ namespace MrServer.Bot.Commands.Nodes
 
         [Command("BeatmapPack")]
         [Hidden]
-        [RequireOwner]
         public async Task GetBeatmapPack(string ID)
         {
             SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
@@ -336,6 +335,7 @@ namespace MrServer.Bot.Commands.Nodes
             {
                 x.Name = packRef.Title;
                 x.Url = $"https://osu.ppy.sh/s/{packRef.BeatmapSetID}";
+                x.IconUrl = "https://cdn.discordapp.com/attachments/420948614966411299/421301562032390164/beatmapPackLogo.png";
             });
 
             eb.Thumbnail = $"https://b.ppy.sh/thumb/{packRef.BeatmapSetID}l.jpg";
@@ -345,6 +345,9 @@ namespace MrServer.Bot.Commands.Nodes
             if (creator != null) eb.Description += $"Created By: [{creator.Username}](https://osu.ppy.sh/u/{creator.UserID})\n";
 
             eb.Description += $"📥 **[Download](https://osu.ppy.sh/d/{packRef.BeatmapSetID}n)**";
+            eb.Color = Color.FromArgb(28, 164, 185);
+
+            eb.Footer = packRef.GetFooter(creator);
 
             eb.AddField(x =>
             {
@@ -353,31 +356,45 @@ namespace MrServer.Bot.Commands.Nodes
             });
 
             //Display beatmaps
-            OsuGameModes previousMode = OsuGameModes.None;
-
-            foreach (OsuBeatmap beatmap in beatmapPack)
             {
-                bool newField = false;
+                OsuGameModes previousMode = OsuGameModes.None;
 
-                if (previousMode != beatmap.GameMode)
+                void addBeatmapField(OsuBeatmap beatmap, bool includeName)
                 {
-                    newField = true;
-
-                    previousMode = beatmap.GameMode;
-
                     eb.AddField(x =>
                     {
-                        x.Name = $"{CustomEmoji.Osu.Gamemode.GetGamemodeEmoji(beatmap.GameMode)} {OsuGameModesConverter.GameModeName(beatmap.GameMode)}";
+                        x.Name = includeName ? $"{CustomEmoji.Osu.Gamemode.GetGamemodeEmoji(beatmap.GameMode)} {OsuGameModesConverter.GameModeName(beatmap.GameMode)}" : "\u200b";
                         x.Value = "empty";
 
                         x.IsInline = true;
                     });
                 }
 
-                string beatmapInfo = $"{CustomEmoji.Osu.Difficulty.GetDifficultyEmoji(beatmap.Difficulty.Rating, beatmap.GameMode)} **[{beatmap.Version}](https://osu.ppy.sh/b/{beatmap.BeatmapID})** - *{string.Format("{0:0.##}", beatmap.Difficulty.Rating)}★*\n";
+                foreach (OsuBeatmap beatmap in beatmapPack)
+                {
+                    bool newField = false;
 
-                if (newField) eb.Fields[eb.Fields.Count - 1].Value = beatmapInfo;
-                else eb.Fields[eb.Fields.Count - 1].Value += beatmapInfo;
+                    if (previousMode != beatmap.GameMode)
+                    {
+                        previousMode = beatmap.GameMode;
+
+                        addBeatmapField(beatmap, true);
+                        newField = true;
+                    }
+
+                    string beatmapInfo = $"{CustomEmoji.Osu.Difficulty.GetDifficultyEmoji(beatmap.Difficulty.Rating, beatmap.GameMode)} **[{beatmap.Version}](https://osu.ppy.sh/b/{beatmap.BeatmapID})** - *{string.Format("{0:0.##}", beatmap.Difficulty.Rating)}★*\n";
+
+                    bool overLimit = eb.Fields[eb.Fields.Count - 1].Value.ToString().Length + beatmapInfo.Length > 1024;
+
+                    if (overLimit)
+                    {
+                        addBeatmapField(beatmap, false);
+                        newField = true;
+                    }
+
+                    if (newField) eb.Fields[eb.Fields.Count - 1].Value = beatmapInfo;
+                    else eb.Fields[eb.Fields.Count - 1].Value += beatmapInfo;
+                }
             }
 
             //Insert a zero width space char to make a new line or remove useless \n
@@ -436,14 +453,11 @@ namespace MrServer.Bot.Commands.Nodes
 
                 for (int i = 0; i < bestPlayUsers.Length; i++)
                 {
-                    string toAdd = bestPlays[i].ToScoreString(bestPlayUsers[i].Country, gameMode, i + 1, longestName);
+                    string toAdd = bestPlays[i].ToScoreString(bestPlayUsers[i].Country, gameMode, i + 1, nameFormat: '\u200b');
 
                     if (i == 0) rankingsField.Value = toAdd;
                     else rankingsField.Value += toAdd;
                 }
-
-                //delete after
-                string testF = string.Format("{0}", longestName != 0 ? bestPlays[0].Username + new string(new char[longestName - bestPlays[0].Username.Length].Select(X => X = ' ').ToArray()) : bestPlays[0].Username);
 
                 rankingsField.IsInline = true;
 
@@ -460,7 +474,7 @@ namespace MrServer.Bot.Commands.Nodes
                             eb.AddField(x =>
                             {
                                 x.Name = $"Your best";
-                                x.Value = boundBestScore.ToScoreString(bound.Country, gameMode, includeReplay: OsuNetwork.ReplayExists(boundBestScore), nameFormat: '\u200b');
+                                x.Value = boundBestScore.ToScoreString(bound.Country, gameMode, includeReplay: boundBestScore.HasReplay, nameFormat: '\u200b');
                                 x.IsInline = true;
                             });
                         }

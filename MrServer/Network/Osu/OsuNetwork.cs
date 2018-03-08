@@ -14,8 +14,6 @@ using MrServer.Bot.Commands;
 using MrServer.Bot.Models;
 using Newtonsoft.Json.Linq;
 using System.Collections;
-using OpenQA.Selenium;
-using OpenQA.Selenium.Chrome;
 
 namespace MrServer.Network.Osu
 {
@@ -32,22 +30,52 @@ namespace MrServer.Network.Osu
 
         private void Network_DiscordMessageReceived(object sender, EventArgModels.DiscordMessageReceivedEventArgs e)
         {
+            bool newDesign = false;
+
             //Detect singular beatmaps
-            Match match = Regex.Match(e.Message.Content, @"osu.ppy.sh\/b\/\d+(&m=\d)?");
-
-            if (!match.Success) match = Regex.Match(e.Message.Content, @"osu.ppy.sh\/p\/beatmap\?b=\d+(&m=\d)?");
-
-            if (match.Success)
             {
-                MatchCollection parameters = Regex.Matches(e.Message.Content, @"\d+");
+                Match match = Regex.Match(e.Message.Content, @"osu.ppy.sh\/b\/\d+(&m=\d)?");
 
-                string ID = parameters[0].Value;
+                if (!match.Success) match = Regex.Match(e.Message.Content, @"osu.ppy.sh\/p\/beatmap\?b=\d+(&m=\d)?");
+                if (!match.Success)
+                {
+                    match = Regex.Match(e.Message.Content, @"osu.ppy.sh\/beatmapsets\/\d+#(osu|taiko|fruits|mania)\/\d+");
+                    newDesign = true;
+                }
 
-                string gameMode = parameters.Count == 2 ? " " + parameters[1].Value : string.Empty;
+                if (match.Success)
+                {
+                    MatchCollection parameters = Regex.Matches(e.Message.Content, @"\d+");
 
-                Console.WriteLine($"Beatmap detected, ID:{ID}");
+                    string ID = newDesign ? parameters[1].Value : parameters[0].Value;
 
-                discord.cService.ExecuteAsync("Beatmap", ID + gameMode, e.Message, internally: true);
+                    string gameMode = newDesign ?
+                        " " + OsuGameModesConverter.ToOfficialNumeration(OsuGameModesConverter.FromOfficialName(Regex.Match(e.Message.Content, @"#(osu|taiko|fruits|mania)").Value.Remove(0, 1), false)).ToString() : 
+                        (parameters.Count == 2 ? " " + parameters[1].Value : string.Empty);
+
+                    Console.WriteLine($"Beatmap detected, ID:{ID}");
+
+                    discord.cService.ExecuteAsync("Beatmap", ID + gameMode, e.Message, internally: true);
+                    return;
+                }
+            }
+            //Detect beatmap packs
+            {
+                Match match = Regex.Match(e.Message.Content, @"osu.ppy.sh\/s\/\d+");
+
+                if (!match.Success) match = Regex.Match(e.Message.Content, @"osu.ppy.sh\/beatmapsets\/\d+");
+
+                if (match.Success)
+                {
+                    MatchCollection parameters = Regex.Matches(e.Message.Content, @"\d+");
+
+                    string ID = parameters[0].Value;
+
+                    Console.WriteLine($"Beatmap pack detected, ID:{ID}");
+
+                    discord.cService.ExecuteAsync("BeatmapPack", ID, e.Message, internally: true);
+                    return;
+                }
             }
         }
 
@@ -62,7 +90,7 @@ namespace MrServer.Network.Osu
         public static async Task<OsuUserRecent> DownloadUserRecent(ulong userID, OsuGameModes gameMode, SocketUserMessage logger = null, bool tolerateNull = false, int maxAttempts = 1) =>
             (await DownloadObjects<OsuUserRecent>(
                 $"{api}get_user_recent?" +
-                $"k={Additionals.Storing.Keys.API_KEYS["Osu"]}&" +
+                $"k={Keys.API_KEYS["Osu"]}&" +
                 $"m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}&" +
                 $"u={userID}&" +
                 $"type=id&" +
@@ -71,7 +99,7 @@ namespace MrServer.Network.Osu
         public static async Task<OsuScore[]> DownloadBeatmapBest(OsuBeatmap beatmap, OsuGameModes gameMode, ulong? user = null, int? scoreCount = null, bool tolerateNull = false, SocketUserMessage logger = null, int maxAttempts = 1) =>
             await DownloadObjects<OsuScore>(
                 $"{api}get_scores?" +
-                $"k={Additionals.Storing.Keys.API_KEYS["Osu"]}&" +
+                $"k={Keys.API_KEYS["Osu"]}&" +
                 $"b={beatmap.BeatmapID}" +
                 string.Format("&limit={0}", scoreCount.HasValue ? $"{scoreCount.Value}" : "1") +
                 $"&m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}" +
@@ -80,40 +108,31 @@ namespace MrServer.Network.Osu
         public static async Task<OsuBeatmap> DownloadBeatmap(int ID, OsuGameModes gameMode, SocketUserMessage logger = null, bool tolerateNull = false, int maxAttempts = 2) =>
             (await DownloadObjects<OsuBeatmap>(
                 $"{api}get_beatmaps?" +
-                $"k={Additionals.Storing.Keys.API_KEYS["Osu"]}&" +
+                $"k={Keys.API_KEYS["Osu"]}&" +
                 $"b={ID}" +
                 string.Format("{0}", gameMode != OsuGameModes.None ? $"&a=1&m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}" : string.Empty), maxAttempts, logger, tolerateNull: tolerateNull))[0];
 
-        public static async Task<OsuBeatmap[]> DownloadBeatmapPack(int ID, int? limit = 15, SocketUserMessage logger = null, bool tolerateNull = false, int maxAttempts = 2) =>
+        public static async Task<OsuBeatmap[]> DownloadBeatmapPack(int ID, int? limit = 30, SocketUserMessage logger = null, bool tolerateNull = false, int maxAttempts = 2) =>
             await DownloadObjects<OsuBeatmap>(
                 $"{api}get_beatmaps?" +
-                $"k={Additionals.Storing.Keys.API_KEYS["Osu"]}&" +
+                $"k={Keys.API_KEYS["Osu"]}&" +
                 $"s={ID}&" +
                 $"limit={limit}", maxAttempts, logger, tolerateNull: tolerateNull);
 
         private static async Task<OsuUser> DownloadUserMain(object user, OsuGameModes gameMode, SocketUserMessage logger, bool tolerateNull, int maxAttempts) =>
             (await DownloadObjects<OsuUser>(
                 $"{api}get_user?" +
-                $"k={Additionals.Storing.Keys.API_KEYS["Osu"]}&" +
+                $"k={Keys.API_KEYS["Osu"]}&" +
                 $"u={user}&m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}", maxAttempts, logger, tolerateNull:tolerateNull, additional: gameMode))[0];
 
 
-        //To be remade
-        public static bool ReplayExists(OsuScore score)
-        {
-            //https://osu.ppy.sh/web/osu-getreplay.php?c={boundBestScore.ScoreID}&m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}
-
-            /*IWebDriver driver = new ChromeDriver();
-
-            driver.Navigate().GoToUrl("https://osu.ppy.sh/");
-
-            driver.FindElement(By.Id("login-open-button")).Click();
-
-            driver.FindElement(By.Id("username-field"))*/
-
-
-            return false;
-        }
+        //Thanks to peppy no longer needed
+        /*public static async Task<bool> ReplayExists(OsuGameModes gameMode, object beatmapID, object userID) => (await NetworkHandler.DownloadJSON(
+            $"{api}get_replay?" +
+            $"k={Keys.API_KEYS["Osu"]}&" +
+            $"m={OsuGameModesConverter.ToOfficialNumeration(gameMode)}&" +
+            $"b={beatmapID}&" +
+            $"u={userID}", 2)).Contains("content");*/
 
         private static async Task<T[]> DownloadObjects<T>(string url, int maxAttempts, SocketUserMessage logger, bool tolerateNull = false, object additional = null)
         {
