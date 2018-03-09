@@ -278,7 +278,7 @@ namespace MrServer.SQL.Osu
                 $"SET " +
                 $"UserName = '{osuUser.Username}'," +
                 $"GameModes = '{(byte)boundUser.GameModes}'," +
-                $"Country = '{osuUser.Country}," +
+                $"Country = '{osuUser.Country}'," +
                 $"MainMode = '{(byte)boundUser.MainMode}' " +
                 $"WHERE UserID = '{boundUser.UserID}'",
                 db_Connection).ExecuteNonQueryAsync();

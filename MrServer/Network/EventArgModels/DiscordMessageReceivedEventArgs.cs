@@ -12,7 +12,7 @@ namespace MrServer.Network.EventArgModels
     public class DiscordMessageReceivedEventArgs : EventArgs
     {
         public SocketUserMessage Message { get; }
-        public SocketChannel Channel;
+        public SocketChannel Channel => Message.Channel;
 
         public DiscordMessageReceivedEventArgs(UserMessage msg, NetworkHandler network)
         {

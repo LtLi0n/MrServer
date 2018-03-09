@@ -14,6 +14,8 @@ using MrServerPackets.Discord.Models.Guilds;
 using MrServer.Bot.Models;
 using System.Linq;
 using MrServer.Network.Osu;
+using MrServer.Bot.Models.Artificial;
+using MrServer.Bot.Models.Artificial.Models;
 
 namespace MrServer.Bot.Client
 {
@@ -35,8 +37,12 @@ namespace MrServer.Bot.Client
 
         private OsuNetwork osu;
 
+        public GuildManagementInteractiveHandler guildManagementHandler;
+
         public DiscordClient(NetworkHandler network)
         {
+            guildManagementHandler = new GuildManagementInteractiveHandler();
+
             TrackedMessages = new List<SocketUserMessage>();
 
             PREFIX = "$";
@@ -86,25 +92,37 @@ namespace MrServer.Bot.Client
 
             if (!string.IsNullOrEmpty(e.Message.Content))
             {
-                //Trigger command response
-                if (e.Message.Content.Substring(0, PREFIX.Length) == PREFIX)
+                InteractiveUser iUser = guildManagementHandler.Users.Find(x => x.ChannelID == e.Channel.ID && x.UserID == e.Message.Author.ID);
+
+                //Check if the message is a response to the interactive message
+                if (iUser != null)
                 {
-                    string cmd = e.Message.Content.Split(' ')[0].Remove(0, PREFIX.Length);
+                    await guildManagementHandler.HandleInteraction(e.Message, iUser, this);
+                }
+                else
+                {
+                    string prefix = await Program.Entry.DataBases.GuildDB.GetCustomPrefix((e.Channel as SocketGuildChannel).Guild.ID, PREFIX);
 
-                    string input = "";
+                    //Trigger command response
+                    if (e.Message.Content.Substring(0, prefix.Length) == prefix)
+                    {
+                        string cmd = e.Message.Content.Split(' ')[0].Remove(0, prefix.Length);
 
-                    if (e.Message.Content.Length > cmd.Length + 1)
-                    {
-                        input = e.Message.Content.Substring(cmd.Length + 2, e.Message.Content.Length - cmd.Length - 2);
-                    }
+                        string input = "";
 
-                    try
-                    {
-                        bool success = await cService.ExecuteAsync(e.Message.Content.Split(' ')[0].Remove(0, PREFIX.Length), input, e.Message);
-                    }
-                    catch (Exception ee)
-                    {
-                        Console.WriteLine(ee);
+                        if (e.Message.Content.Length > cmd.Length + 1)
+                        {
+                            input = e.Message.Content.Substring(cmd.Length + 2, e.Message.Content.Length - cmd.Length - 2);
+                        }
+
+                        try
+                        {
+                            bool success = await cService.ExecuteAsync(e.Message.Content.Split(' ')[0].Remove(0, prefix.Length), input, e.Message);
+                        }
+                        catch (Exception ee)
+                        {
+                            Console.WriteLine(ee);
+                        }
                     }
                 }
             }

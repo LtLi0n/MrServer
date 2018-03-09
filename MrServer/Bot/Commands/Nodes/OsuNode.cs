@@ -63,9 +63,11 @@ namespace MrServer.Bot.Commands.Nodes
                     "Do `$osubind [username]` to continue the use of `$osu` without parameters.");
             }
 
+            OsuGameModes gameMode = boundUser != null ? boundUser.MainMode : OsuGameModes.STD;
+
             SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
 
-            OsuUser osuUser = await OsuNetwork.DownloadUser(userName, boundUser.MainMode, maxAttempts: 2);
+            OsuUser osuUser = await OsuNetwork.DownloadUser(userName, gameMode, maxAttempts: 2);
 
             EmbedBuilder eb = new EmbedBuilder();
 
@@ -182,6 +184,7 @@ namespace MrServer.Bot.Commands.Nodes
                     await OsuDB.WriteOsuGameModeUser(osuUser, gameMode);
 
                     boundUser.GameModes |= gameMode;
+
                     await OsuDB.UpdateBoundOsuUser(osuUser, boundUser);
 
                     await Context.Channel.SendMessageAsync($"You are now being tracked for {Enum.GetName(typeof(OsuGameModes), gameMode)} gameplay.");

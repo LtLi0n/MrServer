@@ -15,8 +15,8 @@ namespace MrServer.SQL
 
         public SQL_DB(string path) => db_Connection = new SQLiteConnection($"Data Source={path};Version=3;");
 
-        public virtual void Open() => db_Connection.Open();
-        public virtual void Close() => db_Connection.Close();
+        public virtual Task Open() => Task.Run(() => { db_Connection.Open(); });
+        public virtual Task Close() => Task.Run(() => { db_Connection.Close(); });
 
         ///<summary> Default = ExecuteNonQueryAsync </summary>
         public virtual async Task ExecuteAsync(string command) => await new SQLiteCommand(command, db_Connection).ExecuteNonQueryAsync();
