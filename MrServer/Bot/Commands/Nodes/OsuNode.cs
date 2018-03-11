@@ -36,10 +36,9 @@ namespace MrServer.Bot.Commands.Nodes
     [RequireRole(417325871838265356)]
     class OsuNode : ICommandNode
     {
-        private OsuSQL OsuDB => Program.Entry.DataBases.OsuDB;
+        private static OsuSQL OsuDB => Program.Entry.DataBases.OsuDB;
 
-        [Command("Osu")]
-        public async Task Osu([Remainder]string userName = null)
+        private static async Task OsuFlexible(string username, CommandEventArgs Context, OsuGameModes gamemode = OsuGameModes.None)
         {
             if (Context.Message.Mentions.Length > 1)
             {
@@ -47,7 +46,7 @@ namespace MrServer.Bot.Commands.Nodes
                 return;
             }
 
-            OsuBoundUserDB boundUser = string.IsNullOrEmpty(userName) ? boundUser = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID) : Context.Message.Mentions.Length == 1 ? await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Mentions[0]) : await OsuDB.GetBoundUserBy_UserName(userName);
+            OsuBoundUserDB boundUser = string.IsNullOrEmpty(username) ? boundUser = await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Author.ID) : Context.Message.Mentions.Length == 1 ? await OsuDB.GetBoundUserBy_DiscordID(Context.Message.Mentions[0]) : await OsuDB.GetBoundUserBy_UserName(username);
 
             if (Context.Message.Mentions.Length == 1 && boundUser == null)
             {
@@ -55,19 +54,19 @@ namespace MrServer.Bot.Commands.Nodes
                 return;
             }
 
-            if (boundUser != null) userName = boundUser.UserName;
-            else if (string.IsNullOrEmpty(userName))
+            if (boundUser != null) username = boundUser.UserName;
+            else if (string.IsNullOrEmpty(username))
             {
                 await Context.Channel.SendMessageAsync(
                     "You don't exist in the database yet." +
                     "Do `$osubind [username]` to continue the use of `$osu` without parameters.");
             }
 
-            OsuGameModes gameMode = boundUser != null ? boundUser.MainMode : OsuGameModes.STD;
+            OsuGameModes gameMode = gamemode == OsuGameModes.None ? (boundUser != null ? boundUser.MainMode : OsuGameModes.STD) : gamemode;
 
             SocketUserMessage msg = await Context.Channel.SendMessageAsync("Fetching data...", attachID: true);
 
-            OsuUser osuUser = await OsuNetwork.DownloadUser(userName, gameMode, maxAttempts: 2);
+            OsuUser osuUser = await OsuNetwork.DownloadUser(username, gameMode, maxAttempts: 2);
 
             EmbedBuilder eb = new EmbedBuilder();
 
@@ -128,8 +127,9 @@ namespace MrServer.Bot.Commands.Nodes
 
             eb.WithAuthor(x =>
             {
-                x.IconUrl = $"https://images-ext-2.discordapp.net/external/sBhebNjHsypWWjDEqpVLu303x-bnOQ7AlxIKozEXgtQ/https/cdn.discordapp.com/attachments/202046273052868608/355446459514093579/mode-osu-med.png";
-                x.Name = $"{osuUser.Username}";
+                x.IconUrl = CustomEmoji.Osu.Gamemode.GetGamemodeEmoji(gameMode).URL;
+                x.Name = osuUser.Username;
+                x.Url = osuUser.ProfileURL;
             });
 
             eb.Color = Color.LightPink;
@@ -138,6 +138,11 @@ namespace MrServer.Bot.Commands.Nodes
 
             await msg.EditAsync("", eb.Build());
         }
+
+        [Command("Osu")] public async Task Osu([Remainder]string username = null) => await OsuFlexible(username, Context);
+        [Command("Taiko")] public async Task Taiko([Remainder]string username = null) => await OsuFlexible(username, Context, OsuGameModes.Taiko);
+        [Command("CtB")] public async Task CtB([Remainder]string username = null) => await OsuFlexible(username, Context, OsuGameModes.CtB);
+        [Command("Mania")] public async Task Mania([Remainder]string username = null) => await OsuFlexible(username, Context, OsuGameModes.Mania);
 
         [Command("OsuUnTrack")]
         public async Task Osu_UnTrack(string gameModeStr)
@@ -328,6 +333,14 @@ namespace MrServer.Bot.Commands.Nodes
 
             beatmapPack = beatmapPack.OrderBy(x => x.Difficulty.Rating).OrderBy(x => x.GameMode);
 
+            OsuGameModes[] gameModes; //get amount of gamemodes present in the beatmapset
+            {
+                List<OsuGameModes> collector = new List<OsuGameModes>();
+                Tool.ForEach(beatmapPack, x => { if (!collector.Contains(x.GameMode)) collector.Add(x.GameMode); });
+
+                gameModes = collector.ToArray();
+            }
+
             OsuBeatmap packRef = beatmapPack.First();
 
             OsuUser creator = await OsuNetwork.DownloadUser(packRef.Creator, OsuGameModes.STD, tolerateNull: true, maxAttempts: 3);
@@ -337,19 +350,20 @@ namespace MrServer.Bot.Commands.Nodes
             eb.WithAuthor(x =>
             {
                 x.Name = packRef.Title;
-                x.Url = $"https://osu.ppy.sh/s/{packRef.BeatmapSetID}";
+                x.Url = packRef.URL;
                 x.IconUrl = "https://cdn.discordapp.com/attachments/420948614966411299/421301562032390164/beatmapPackLogo.png";
             });
 
-            eb.Thumbnail = $"https://b.ppy.sh/thumb/{packRef.BeatmapSetID}l.jpg";
+            eb.Image = $"{packRef.CoverPictureURL}"; //$"https://b.ppy.sh/thumb/{packRef.BeatmapSetID}l.jpg";
 
             eb.Description = "";
 
-            if (creator != null) eb.Description += $"Created By: [{creator.Username}](https://osu.ppy.sh/u/{creator.UserID})\n";
+            if (creator != null) eb.Description += $"Created By: [{creator.Username}]({creator.ProfileURL})\n";
 
-            eb.Description += $"📥 **[Download](https://osu.ppy.sh/d/{packRef.BeatmapSetID}n)**";
+            eb.Description += $"📥 **[Download]({packRef.DownloadURL(false)})**";
             eb.Color = Color.FromArgb(28, 164, 185);
 
+            eb.Thumbnail = packRef.ThumbnailPictureURL;
             eb.Footer = packRef.GetFooter(creator);
 
             eb.AddField(x =>
@@ -360,43 +374,45 @@ namespace MrServer.Bot.Commands.Nodes
 
             //Display beatmaps
             {
-                OsuGameModes previousMode = OsuGameModes.None;
-
-                void addBeatmapField(OsuBeatmap beatmap, bool includeName)
+                void addBeatmapField(OsuGameModes gamemode, bool includeName)
                 {
                     eb.AddField(x =>
                     {
-                        x.Name = includeName ? $"{CustomEmoji.Osu.Gamemode.GetGamemodeEmoji(beatmap.GameMode)} {OsuGameModesConverter.GameModeName(beatmap.GameMode)}" : "\u200b";
+                        x.Name = includeName ? $"{CustomEmoji.Osu.Gamemode.GetGamemodeEmoji(gamemode)} {OsuGameModesConverter.GameModeName(gamemode)}" : CustomEmoji.Void.ToString();
                         x.Value = "empty";
 
                         x.IsInline = true;
                     });
                 }
 
+                for(int i = 0; i < gameModes.Length; i++) for (int ii = 0; ii < 2; ii++) addBeatmapField(gameModes[i], ii == 0);
+
+                OsuGameModes previousMode = OsuGameModes.None;
+
+                int efbRef = 0;
+                int efbPos = -1;
+
                 foreach (OsuBeatmap beatmap in beatmapPack)
                 {
-                    bool newField = false;
-
                     if (previousMode != beatmap.GameMode)
                     {
                         previousMode = beatmap.GameMode;
+                        efbPos++;
 
-                        addBeatmapField(beatmap, true);
-                        newField = true;
+                        efbRef = 0;
                     }
 
-                    string beatmapInfo = $"{CustomEmoji.Osu.Difficulty.GetDifficultyEmoji(beatmap.Difficulty.Rating, beatmap.GameMode)} **[{beatmap.Version}](https://osu.ppy.sh/b/{beatmap.BeatmapID})** - *{string.Format("{0:0.##}", beatmap.Difficulty.Rating)}★*\n";
+                    string beatmapVersion = beatmap.Version;
 
-                    bool overLimit = eb.Fields[eb.Fields.Count - 1].Value.ToString().Length + beatmapInfo.Length > 1024;
+                    if (beatmapVersion.Length > 14) beatmapVersion = beatmapVersion.Substring(0, 14) + "...";
 
-                    if (overLimit)
-                    {
-                        addBeatmapField(beatmap, false);
-                        newField = true;
-                    }
+                    string beatmapInfo = $"{CustomEmoji.Osu.Difficulty.GetDifficultyEmoji(beatmap.Difficulty.Rating, beatmap.GameMode)} **[{beatmapVersion}](https://osu.ppy.sh/b/{beatmap.BeatmapID})**\n"; // - *{string.Format("{0:0.##}", beatmap.Difficulty.Rating)}★*
 
-                    if (newField) eb.Fields[eb.Fields.Count - 1].Value = beatmapInfo;
-                    else eb.Fields[eb.Fields.Count - 1].Value += beatmapInfo;
+                    if (eb.Fields[efbPos * 2 + efbRef + 1].Value == "empty") eb.Fields[efbPos * 2 + efbRef + 1].Value = beatmapInfo;
+                    else eb.Fields[efbPos * 2 + efbRef + 1].Value += beatmapInfo;
+
+                    efbRef++;
+                    if (efbRef == 2) efbRef = 0;
                 }
             }
 
@@ -405,8 +421,12 @@ namespace MrServer.Bot.Commands.Nodes
             {
                 string efbStr = eb.Fields[i].Value.ToString();
 
-                if (i < 3 && eb.Fields.Count > 3) eb.Fields[i].Value = efbStr + '\u200b';
-                else eb.Fields[i].Value = efbStr.Remove(efbStr.Length - 1, 1);
+                if (i < eb.Fields.Count - 2) eb.Fields[i].Value = efbStr + '\u200b';
+                else
+                {
+                    if (eb.Fields[i].Value == "empty") eb.Fields.Remove(eb.Fields[i]);
+                    else eb.Fields[i].Value = efbStr.Remove(efbStr.Length - 1, 1);
+                }
             }
 
             await msg.EditAsync($"showing {beatmapPack.Count()} beatmaps", eb.Build());

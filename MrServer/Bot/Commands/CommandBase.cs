@@ -1,5 +1,6 @@
 ﻿using MrServer.Bot.Commands.Attributes;
 using MrServer.Bot.Commands.Attributes.Permissions;
+using MrServer.Bot.Commands.Nodes;
 using MrServer.Bot.Commands.Permissions;
 using System;
 using System.Collections.Generic;
@@ -16,6 +17,8 @@ namespace MrServer.Bot.Commands
         protected PermissionAttribute[] _permissions;
 
         protected MethodInfo _methodInfo;
+        //Todo when i have a lot of time, not crazy priority since computers are fast enough
+        //protected Func<ICommandNode, CommandBase, object[], Task> _action;
 
         protected bool Hidden;
         protected string CMD;

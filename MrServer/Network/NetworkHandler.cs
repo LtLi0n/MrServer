@@ -217,7 +217,7 @@ namespace MrServer.Network
 
         }
 
-        public static async Task<string> DownloadJSON(string url, int maxAttempts)
+        public static async Task<string> DownloadJSON(string url, int maxAttempts = 1, bool readable = false)
         {
             using (HttpClient htppClient = new HttpClient())
             {
@@ -225,7 +225,9 @@ namespace MrServer.Network
                 {
                     try
                     {
-                        return await htppClient.GetStringAsync(url);
+                        string json = await htppClient.GetStringAsync(url);
+                        if(readable) return json;
+                        else return JsonConvert.SerializeObject(JsonConvert.DeserializeObject(json), Formatting.Indented);
                     }
                     catch (Exception e)
                     {

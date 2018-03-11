@@ -19,7 +19,8 @@ namespace MrServer.Bot.Models.Artificial.Models
         {
             var methods = new Func<InteractiveEventArgs, Task<(string, InteractiveEventArgs)>>[]
             {
-                o, o_prefix, o_prefix_select, o_prefix_select_final
+                o, //Entry
+                o_prefix, o_prefix_select, o_prefix_select_final //Prefix
             };
 
             await ConvertToHierarchy(methods);
@@ -34,10 +35,7 @@ namespace MrServer.Bot.Models.Artificial.Models
 
             string input = e.Message.Content.ToLower();
 
-            if (!e.IsSimulated)
-            {
-                if (input == "prefix") return ("o->1", e);
-            }
+            if (!e.IsSimulated) if (input == "prefix") return ("o->1", e);
 
             return ("o", e);
         }
@@ -79,7 +77,6 @@ namespace MrServer.Bot.Models.Artificial.Models
                 {
                     if (input.Length < 3)
                     {
-                        e.User.Inputs.Clear();
                         e.User.Inputs.Add(input);
                         return Task.FromResult(("o->1->1->1", e));
                     }
@@ -107,6 +104,8 @@ namespace MrServer.Bot.Models.Artificial.Models
                         await GuildDB.SavePrefix((e.Channel as SocketGuildChannel).Guild.ID, input, e.Discord.PREFIX);
 
                         e.Displayer = $"Guild prefix successfully changed to `{input}`!";
+
+                        e.User.Inputs.Clear();
 
                         return ("o", e);
                     }

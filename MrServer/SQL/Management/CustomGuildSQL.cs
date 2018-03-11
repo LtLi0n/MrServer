@@ -19,7 +19,7 @@ namespace MrServer.SQL.Management
 
             if (prefix == defaultPrefix) await new SQLiteCommand($"DELETE FROM prefixes WHERE ID = {guildID}", db_Connection).ExecuteNonQueryAsync();
             else if (check == defaultPrefix) await new SQLiteCommand($"INSERT INTO prefixes (Prefix, ID) VALUES ('{prefix}', '{guildID}')", db_Connection).ExecuteNonQueryAsync();
-            else await new SQLiteCommand($"UPDATE prefixes SET Prefix = {prefix} WHERE ID = {guildID}", db_Connection).ExecuteNonQueryAsync();
+            else await new SQLiteCommand($"UPDATE prefixes SET Prefix = '{prefix}' WHERE ID = {guildID}", db_Connection).ExecuteNonQueryAsync();
         }
 
         public Task<string> GetCustomPrefix(ulong guildID, string defaultPrefix)
